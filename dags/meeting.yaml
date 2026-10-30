@@ -1,0 +1,83 @@
+description: >
+  One recorded meeting, from its recording page on the wiki to a published summary.
+  meeting-poll queues it when someone ticks "Ready to transcribe". To run one by hand,
+  start it with the page's document id; DRY_RUN=1 writes nothing to the wiki.
+tags: [meetings]
+# Not the login shell, whose startup files can rewrite PATH. (dagu.yaml's
+# default_shell didn't take for `dagu start` in 2.24.)
+shell: /bin/sh
+
+params:
+  - name: DOC_ID
+    type: string
+    required: true
+    description: The recording page's Outline document id
+  - name: DRY_RUN
+    type: string
+    default: ""
+    description: Any value but "" or 0 keeps the run off the wiki (no status, no publish)
+
+env:
+  - DRY_RUN: ${params.DRY_RUN}
+
+# No queue: a DAG without one gets its own, which runs one meeting at a time. That's
+# what whisper needs (4 threads, a few GB each), and it means the window step below
+# holds back the whole queue outside RUN_HOURS.
+timeout_sec: 86400  # a run can wait most of a day for its window
+
+steps:
+  - id: window
+    run: aspen-steps window ${params.DOC_ID}
+
+  - id: fetch
+    depends: window
+    run: aspen-steps fetch ${params.DOC_ID}
+    retry_policy: &transient
+      limit: 3
+      interval_sec: 900
+      backoff: true
+      exit_code: [1]  # 2 means a person has to fix the page first
+
+  - id: transcribe
+    depends: fetch
+    run: aspen-steps transcribe ${params.DOC_ID}
+    retry_policy: *transient
+
+  - id: frames
+    depends: transcribe  # it deletes the WAV whisper reads
+    run: aspen-steps frames ${params.DOC_ID}
+    retry_policy: *transient
+
+  - id: context
+    depends: fetch
+    run: aspen-steps context ${params.DOC_ID}
+    retry_policy:
+      limit: 3
+      interval_sec: 60
+      backoff: true
+      exit_code: [1]
+
+  # The only step with a model in it. The agent reads files and writes two: it has no
+  # wiki access. The step checks what it wrote and sends any problems back once.
+  - id: summarise
+    depends: [frames, context]
+    run: aspen-steps summarise ${params.DOC_ID}
+    retry_policy:
+      limit: 1
+      interval_sec: 300
+      exit_code: [1]
+
+  - id: publish
+    depends: summarise
+    run: aspen-steps publish ${params.DOC_ID}
+    retry_policy:
+      limit: 3
+      interval_sec: 60
+      backoff: true
+      exit_code: [1]
+
+handler_on:
+  failure:
+    run: aspen-steps fail ${params.DOC_ID}
+  exit:
+    run: aspen-steps clean ${params.DOC_ID}

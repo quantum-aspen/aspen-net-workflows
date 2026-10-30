@@ -1,0 +1,47 @@
+[project]
+name = "aspen-net-workflows"
+version = "0.1.0"
+description = "ASPEN-NET's Dagu workflows and the step commands they run."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "pydantic==2.14.1",
+]
+
+[project.optional-dependencies]
+# What the meeting workflow's media steps need: the local-meeting-transcript
+# skill's scripts run in this environment. The image installs it; tests don't.
+media = [
+    "faster-whisper==1.2.1",
+    # faster-whisper 1.2.1 passes av.open(metadata_errors=...), which PyAV 19 removed.
+    "av==18.1.0",
+    "yt-dlp==2026.6.9",
+]
+
+[project.scripts]
+aspen-steps = "aspen_steps.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.14",
+]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "aspen_steps"
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"dev/seed.py" = ["E501"]  # template text, kept as people will read it
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

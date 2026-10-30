@@ -1,0 +1,26 @@
+# Dagu server config. The image points DAGU_HOME at the data volume and DAGU_DAGS_DIR at
+# this repo's dags/. dev/run.sh does the same against dev/.
+tz: America/Denver
+
+# Dagu hands steps only a few variables by default. These are the ones the steps read.
+env_passthrough:
+  - OUTLINE_URL
+  - OUTLINE_API_KEY
+  - MEETINGS_COLLECTION_ID
+  - DATA_DIR
+  - SKILL_DIR
+  - WHISPER_MODEL
+  - RUN_HOURS
+  - AGENT
+  - AGENT_MODEL
+  - AGENT_MAX_TURNS
+  - AGENT_BUDGET_SECONDS
+  - MENTIONS
+  - LUMEN_BASE_URL
+  - LUMEN_API_KEY
+  - HERMES_HOME
+  - HF_HOME
+  - VIRTUAL_ENV
+env_passthrough_prefixes:
+  - TRANSCRIBE_  # transcribe.py's remote-whisper settings
+  - DAGU_        # so poll's `dagu enqueue` finds the same home and DAGs

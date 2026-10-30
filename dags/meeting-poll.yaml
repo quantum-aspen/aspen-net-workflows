@@ -1,0 +1,13 @@
+description: >
+  Every 5 minutes, claims recording pages ticked "Ready to transcribe" in the Meetings
+  collection and queues a meeting run for each.
+tags: [meetings]
+# Not the login shell, whose startup files can rewrite PATH. (dagu.yaml's
+# default_shell didn't take for `dagu start` in 2.24.)
+shell: /bin/sh
+schedule: "*/5 * * * *"
+overlap_policy: skip
+
+steps:
+  - id: poll
+    run: aspen-steps poll
