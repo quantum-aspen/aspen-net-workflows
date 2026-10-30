@@ -42,6 +42,8 @@ class Config:
     agent_budget: int
     mentions: bool
     dagu: str
+    # Read the wiki but don't write to it: outline.Outline records each write instead.
+    dry_run: bool
 
     @property
     def work_root(self) -> Path:
@@ -72,4 +74,5 @@ class Config:
             agent_budget=int(e.get("AGENT_BUDGET_SECONDS", "2700")),
             mentions=e.get("MENTIONS", "1") not in ("", "0", "false"),
             dagu=e.get("DAGU_BIN", "dagu"),
+            dry_run=e.get("DRY_RUN", "") not in ("", "0", "false"),
         )

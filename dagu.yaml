@@ -1,5 +1,5 @@
 # Dagu server config. The image points DAGU_HOME at the data volume and DAGU_DAGS_DIR at
-# this repo's dags/. dev/run.sh does the same against dev/.
+# this repo's dags/. The dev compose.yaml mounts this file the same way.
 tz: America/Denver
 
 # Dagu hands steps only a few variables by default. These are the ones the steps read.

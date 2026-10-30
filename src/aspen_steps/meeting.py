@@ -4,7 +4,6 @@ Media steps are in media.py. Every step takes the recording page's document id; 
 work dir is named after it, so a page is a job."""
 
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -22,25 +21,21 @@ from .outline import Outline
 EARLIER = 3  # summaries from the same series the agent reads for cross-references
 
 
-def outline(cfg: Config) -> Outline:
+def outline(cfg: Config, wd: Path | None = None) -> Outline:
+    """A dry run records the writes it would make in the job's would-write/ (or the data
+    dir's, for writes that aren't a job's)."""
     if not cfg.outline_api_key.get_secret_value():
         raise StepError("OUTLINE_API_KEY isn't set")
-    return Outline(cfg.outline_url, cfg.outline_api_key)
-
-
-def dry_run() -> bool:
-    return os.environ.get("DRY_RUN", "") not in ("", "0", "false")
+    would_write = (wd or cfg.data_dir) / "would-write" if cfg.dry_run else None
+    return Outline(cfg.outline_url, cfg.outline_api_key, would_write=would_write)
 
 
 # ---- status on the page --------------------------------------------------------------
 
 
 def status(cfg: Config, doc_id: str, text: str, *, failed: bool = False) -> None:
-    """Shows progress on the recording page. Best effort, and never in a dry run."""
-    if dry_run():
-        print(f"[dry run] status: {text}")
-        return
-    ol = outline(cfg)
+    """Shows progress on the recording page. Best effort."""
+    ol = outline(cfg, cfg.work_dir(doc_id))
     doc = ol.document(doc_id)
     ol.update(doc_id, text=page.set_status(doc["text"], text, failed=failed))
 
@@ -61,6 +56,39 @@ def fail(cfg: Config, doc_id: str) -> None:
 # ---- poll ----------------------------------------------------------------------------
 
 
+def claim(cfg: Config, doc_id: str, series: dict[str, str] | None = None) -> Path:
+    """Makes a recording page a job: writes job.json and the passcode to its work dir, and
+    swaps the page's tick box for a status callout. Takes the page's id or its link's url id,
+    and returns the work dir, which is named by the id."""
+    ol = outline(cfg)
+    if series is None:
+        series = {n["id"]: n["title"] for n in ol.tree(cfg.meetings_collection)}
+    doc = ol.document(doc_id)
+    parent = doc.get("parentDocumentId")
+    rec = page.parse(doc.get("text") or "")
+    if parent not in series:
+        raise NeedsPerson(f"{doc['title']!r} isn't directly under a series page in Meetings")
+    if not rec.link:
+        raise NeedsPerson(f"{doc['title']!r} has no Zoom recording link")
+    wd = cfg.work_dir(doc["id"])
+    wd.mkdir(parents=True, exist_ok=True)
+    shutil.rmtree(wd / "errors", ignore_errors=True)
+    ol = outline(cfg, wd)
+    (wd / "job.json").write_text(
+        json.dumps(
+            {"doc_id": doc["id"], "url": rec.link, "series_id": parent, "series": series[parent]}, indent=1
+        )
+    )
+    text, passcode = page.claim(doc["text"], "queued")
+    if passcode:
+        # A re-tick without a passcode keeps the one from last time, if fetch never used it.
+        secret = wd / ".passcode"
+        secret.touch(mode=0o600)
+        secret.write_text(passcode)
+    ol.update(doc["id"], text=text)
+    return wd
+
+
 def poll(cfg: Config) -> list[str]:
     """Claims every ticked recording page under a series and queues a meeting run for it."""
     if not cfg.meetings_collection:
@@ -69,26 +97,9 @@ def poll(cfg: Config) -> list[str]:
     series = {n["id"]: n["title"] for n in ol.tree(cfg.meetings_collection)}
     queued = []
     for doc in ol.recently_updated(cfg.meetings_collection):
-        parent = doc.get("parentDocumentId")
-        rec = page.parse(doc.get("text") or "")
-        if parent not in series or not rec.ready:
+        if doc.get("parentDocumentId") not in series or not page.parse(doc.get("text") or "").ready:
             continue
-        wd = cfg.work_dir(doc["id"])
-        wd.mkdir(parents=True, exist_ok=True)
-        shutil.rmtree(wd / "errors", ignore_errors=True)
-        (wd / "job.json").write_text(
-            json.dumps(
-                {"doc_id": doc["id"], "url": rec.link, "series_id": parent, "series": series[parent]},
-                indent=1,
-            )
-        )
-        text, passcode = page.claim(doc["text"], "queued")
-        if passcode:
-            # A re-tick without a passcode keeps the one from last time, if fetch never used it.
-            secret = wd / ".passcode"
-            secret.touch(mode=0o600)
-            secret.write_text(passcode)
-        ol.update(doc["id"], text=text)
+        claim(cfg, doc["id"], series)
         try:
             out = subprocess.run(
                 [cfg.dagu, "enqueue", "meeting", "--", f"DOC_ID={doc['id']}"],
@@ -97,9 +108,9 @@ def poll(cfg: Config) -> list[str]:
             print(out.stdout.strip())
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
             detail = getattr(e, "stderr", "") or str(e)
-            ol.update(doc["id"], text=page.set_status(text, f"failed to queue: {detail[-200:]}", failed=True))
+            status(cfg, doc["id"], f"failed to queue: {detail[-200:]}", failed=True)
             continue
-        print(f"queued {doc['title']!r} ({doc['id']}) in {series[parent]!r}")
+        print(f"queued {doc['title']!r} ({doc['id']}) in {series[doc['parentDocumentId']]!r}")
         queued.append(doc["id"])
     return queued
 
@@ -294,34 +305,24 @@ def publish(cfg: Config, wd: Path) -> None:
     result, summary = check.load(wd)
     job = json.loads((wd / "job.json").read_text())
     title = f"{result.date} {result.title}"
-    dry = dry_run()
-    ol = outline(cfg)
+    ol = outline(cfg, wd)
 
     used = {}
     for ref in dict.fromkeys(check.IMAGE.findall(summary)):
         if ref.startswith("frames/"):
-            used[ref] = f"https://example.invalid/{ref}" if dry else ol.upload(job["doc_id"], wd / ref)
+            used[ref] = ol.upload(job["doc_id"], wd / ref)
     for ref, url in used.items():
         summary = summary.replace(f"]({ref})", f"]({url})")
 
-    if dry:
-        (wd / "out" / "page.md").write_text(f"# {title}\n\n{summary}")
-        path = f"/doc/{job['doc_id']}"
-        print(f"[dry run] page written to {wd / 'out' / 'page.md'}")
-    else:
-        path = ol.update(job["doc_id"], title=title, text=summary)["url"]
-        print(f"published {title!r}: {cfg.outline_url}{path}")
+    path = ol.update(job["doc_id"], title=title, text=summary)["url"]
+    print(f"published {title!r}: {cfg.outline_url}{path}")
     wiki_url = cfg.outline_url + path
 
     if result.series_row:
         # relative, like the links people make in the wiki's own editor
         row = {k: v.replace("{{page_url}}", path) for k, v in result.series_row.items()}
         series = ol.document(job["series_id"])
-        text = _insert_row(series["text"], row)
-        if dry:
-            (wd / "out" / "series.md").write_text(text)
-        else:
-            ol.update(job["series_id"], text=text)
+        ol.update(job["series_id"], text=_insert_row(series["text"], row))
         print(f"added a row to {job['series']!r}")
 
     out = _transcript_folder(cfg, wd, result, title, wiki_url)

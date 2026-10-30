@@ -1,7 +1,9 @@
 """The Outline API calls the steps make. Agents never get this key."""
 
+import difflib
 import json
 import mimetypes
+import sys
 import urllib.error
 import urllib.request
 import uuid
@@ -19,9 +21,22 @@ class OutlineError(RuntimeError):
 
 
 class Outline:
-    def __init__(self, base_url: str, api_key: SecretStr):
+    """With `would_write` set, it's a dry run: reads go to the wiki, but writes don't. Each
+    one is recorded in that directory instead: the new text of a page and a diff against
+    what's there now, or the name of a file that would be uploaded."""
+
+    def __init__(self, base_url: str, api_key: SecretStr, *, would_write: Path | None = None):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
+        self.would_write = would_write
+
+    def _record(self, name: str, files: dict[str, str]) -> None:
+        self.would_write.mkdir(parents=True, exist_ok=True)
+        n = len({f.name.split(" ", 1)[0] for f in self.would_write.iterdir()}) + 1
+        stem = f"{n:02d} {name.replace('/', '-')}"
+        for ext, content in files.items():
+            (self.would_write / f"{stem}{ext}").write_text(content)
+        print(f"[dry run] would write: {self.would_write / stem}.*", file=sys.stderr)
 
     def _send(self, req: urllib.request.Request, what: str) -> dict:
         req.add_header("Authorization", f"Bearer {self.api_key.get_secret_value()}")
@@ -52,6 +67,17 @@ class Outline:
         return self._post("documents.info", {"id": doc_id})
 
     def update(self, doc_id: str, *, text: str | None = None, title: str | None = None) -> dict:
+        if self.would_write is not None:
+            doc = self.document(doc_id)
+            new = doc | {k: v for k, v in (("text", text), ("title", title)) if v is not None}
+            diff = difflib.unified_diff(
+                f"# {doc['title']}\n\n{doc['text']}".splitlines(keepends=True),
+                f"# {new['title']}\n\n{new['text']}".splitlines(keepends=True),
+                f"{doc['title']} (now)",
+                f"{new['title']} (would be)",
+            )
+            self._record(f"update {doc['title']}", {".md": new["text"], ".diff": "".join(diff)})
+            return new
         body = {"id": doc_id}
         if text is not None:
             body["text"] = text
@@ -92,6 +118,9 @@ class Outline:
     def upload(self, doc_id: str, path: Path) -> str:
         """Attaches a file to a document and returns its URL. Two steps:
         attachments.create says where to send the file, then a multipart POST sends it."""
+        if self.would_write is not None:
+            self._record(f"upload {path.name}", {".txt": f"{path}\n"})
+            return f"dry-run:{path.name}"
         ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         data = path.read_bytes()
         a = self._post(

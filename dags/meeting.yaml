@@ -1,7 +1,8 @@
 description: >
   One recorded meeting, from its recording page on the wiki to a published summary.
   meeting-poll queues it when someone ticks "Ready to transcribe". To run one by hand,
-  start it with the page's document id; DRY_RUN=1 writes nothing to the wiki.
+  `aspen-steps claim <page id>`, then start it with that DOC_ID. DRY_RUN=1 reads the wiki but records each write
+  in the work dir's would-write/ instead of making it.
 tags: [meetings]
 # Not the login shell, whose startup files can rewrite PATH. (dagu.yaml's
 # default_shell didn't take for `dagu start` in 2.24.)
@@ -15,7 +16,7 @@ params:
   - name: DRY_RUN
     type: string
     default: ""
-    description: Any value but "" or 0 keeps the run off the wiki (no status, no publish)
+    description: Any value but "" or 0 records the run's wiki writes in would-write/ instead of making them
 
 env:
   - DRY_RUN: ${params.DRY_RUN}

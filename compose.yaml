@@ -1,0 +1,29 @@
+# Development: the real image against the real wiki, in a dry run by default. Production
+# lives in aspen-net-deployments, which pulls the published image instead.
+#
+#   cp .env.example .env    # your Outline API key, the Meetings collection id
+#   just up                 # Dagu UI on http://127.0.0.1:18080
+#   just try <doc id>       # one recording page through the meeting workflow
+#
+# Only the UI server runs, not the scheduler, so meeting-poll never fires here.
+name: aspen-net-workflows-dev
+
+services:
+  workflows:
+    build: .
+    image: aspen-net-workflows:dev
+    command: [dagu, server, --host, 0.0.0.0, --port, "8080"]
+    env_file: .env
+    environment:
+      AGENT: ${AGENT:-hermes}
+      DAGU_AUTH_MODE: none  # the UI only listens on localhost
+    ports:
+      - 127.0.0.1:18080:8080
+    volumes:
+      # Edits to the DAGs and steps apply without a rebuild.
+      - ./dags:/opt/workflows/dags:ro
+      - ./src:/opt/workflows/src:ro
+      - ./dagu.yaml:/opt/data/dagu/config.yaml:ro
+      # Work dirs, would-write/ reports and transcripts, readable from the host.
+      - ./.data:/opt/data
+    mem_limit: 6g

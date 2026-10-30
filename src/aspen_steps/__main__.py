@@ -38,7 +38,7 @@ PER_MEETING = {
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     ap = argparse.ArgumentParser(prog="aspen-steps")
-    ap.add_argument("step", choices=["poll", "fail", *PER_MEETING])
+    ap.add_argument("step", choices=["poll", "claim", "fail", *PER_MEETING])
     ap.add_argument("doc_id", nargs="?")
     args = ap.parse_args(argv)
     cfg = Config.from_env()
@@ -50,6 +50,13 @@ def main(argv: list[str] | None = None) -> int:
         ap.error(f"{args.step} needs the recording page's document id")
     if args.step == "fail":
         meeting.fail(cfg, args.doc_id)
+        return 0
+    if args.step == "claim":  # poll does this for each ticked page; by hand, for trying one out
+        try:
+            print(meeting.claim(cfg, args.doc_id).name)  # the page's id, for DOC_ID
+        except NeedsPerson as e:
+            print(f"can't claim it: {e}", file=sys.stderr)
+            return 2
         return 0
 
     wd = cfg.work_dir(args.doc_id)

@@ -1,0 +1,11 @@
+1
+00:00:01,000 --> 00:00:05,000
+Okay, let's get started.
+
+2
+00:00:56,000 --> 00:01:00,000
+The coffee machine is broken again.
+
+3
+00:01:05,000 --> 00:01:08,000
+Agreed on ZeroMQ.

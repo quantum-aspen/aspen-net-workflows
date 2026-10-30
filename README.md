@@ -27,15 +27,15 @@ step.
 The series is wherever you put the page, so there's no guessing a series from the meeting
 content. A ticked page that isn't directly under a series page is ignored.
 
-The Meeting recording template is the text in `RECORDING` in `dev/seed.py`. It has to be
-added to the wiki by hand.
+The Meeting recording template is `templates/meeting-recording.md`. It has to be added to
+the wiki by hand.
 
 ## Workflows
 
 | DAG | What |
 |---|---|
 | `meeting-poll` | Every 5 min: claims ticked recording pages and queues a `meeting` run for each |
-| `meeting` | One recording page to a published summary. Start it by hand with `DOC_ID=<page id>`; `DRY_RUN=1` writes nothing to the wiki |
+| `meeting` | One recording page to a published summary. By hand: `aspen-steps claim <page id>`, then start it with `DOC_ID=<page id>`. `DRY_RUN=1` records its wiki writes instead of making them |
 
 ```
 meeting-poll ──enqueue──▶ meeting(DOC_ID)
@@ -78,31 +78,37 @@ dags/            the workflows
 dagu.yaml        Dagu server config (env passthrough, timezone)
 src/aspen_steps/ one command per step: aspen-steps <step> [doc id]
   page.py        the recording-page protocol: link, passcode, tick box, status callout
-  meeting.py     poll, context, summarise, publish, status
+  meeting.py     poll, claim, context, summarise, publish, status
   media.py       fetch, transcribe, frames (the local-meeting-transcript skill's scripts)
   agent.py       unattended agent runs, hermes or claude
   check.py       the agent's output shape and the checks it must pass
+  outline.py     the wiki API, and the dry run: writes recorded, not made
   prompts/       the summary prompt
-dev/             mock Outline, seed data, a synthetic meeting, the end-to-end script
-tests/           pytest, against the mock
+templates/       the Meeting recording template, to add to the wiki by hand
+tests/           pytest on the steps' own logic, with a checked-in work dir
 ```
 
 ## Development
 
+There's no stand-in wiki. The steps run against the real one in a **dry run**: they read
+it as usual, but each write (a page update, an upload) is recorded in the job's
+`would-write/` instead, as the new page text and a diff against what's there now. Any
+recording page with a Zoom link works, even one that's already been summarised, and
+nothing on the wiki changes. Your own Outline API key (the one the Outline MCP uses) is
+fine for this.
+
 ```sh
-uv sync --extra media
-uv run pytest && uv run ruff check && uv run ruff format --check
+just test                # pytest, ruff
 
-# a synthetic meeting (TTS voices, two slides, ai: chat commands), once:
-uv run --no-project --with edge-tts python dev/make_fixture.py dev/fixture \
-  ../aspen-net-skills/skills/local-meeting-transcript
-
-dev/run.sh       # mock wiki + Dagu + real whisper + real agent: tick to summary
-dev/run.sh up    # just start them; Dagu UI on http://127.0.0.1:18080
+cp .env.example .env     # your Outline key, the Meetings collection id, Lumen
+just up                  # build and start the image; Dagu UI on http://127.0.0.1:18080
+just try <page id>       # claim the page and run the meeting workflow on it
+ls .data/work/<page id>/would-write/
 ```
 
-`dev/run.sh` copies the fixture into the job's work dir, so `fetch` skips the Zoom
-download. Everything after that runs for real.
+`just up` runs only Dagu's UI server, not its scheduler, so `meeting-poll` doesn't fire.
+`dags/` and `src/` are mounted, so edits apply without a rebuild. Set `DRY_RUN=0` in
+`.env` only when you mean to write to the wiki.
 
 ## Configuration
 
@@ -117,16 +123,18 @@ download. Everything after that runs for real.
 | `AGENT`, `AGENT_MODEL` | `hermes` | `claude` for dev |
 | `AGENT_MAX_TURNS`, `AGENT_BUDGET_SECONDS` | 90, 2700 | |
 | `MENTIONS` | on | @mention attendees and owners |
+| `DRY_RUN` | off | read the wiki, record writes in `would-write/` |
 
 ## Not done yet
 
 - **Image.** `Dockerfile` is a sketch and hasn't been built. It also needs the Hermes
   config without the Outline MCP.
-- **Hermes isn't tested.** The end-to-end test used `AGENT=claude`.
+- **Hermes isn't tested.** The prototype's end-to-end run used `AGENT=claude`; `just try`
+  uses Hermes, so its first run is the first Hermes test.
 - **`fetch` isn't tested against Zoom** here. It's the skill's unchanged `fetch.sh`.
-- **The real wiki is untested.** The Outline calls were checked against the mock, not the
-  wiki. `templates.list`, `collections.documents` and attachment upload are the ones to
-  watch.
+- **The real wiki is untested.** The prototype checked its Outline calls against a mock.
+  A dry run covers the reads (`templates.list` and `collections.documents` are the ones to
+  watch); attachment upload only runs for real.
 - **Polling is slow and only sees recent edits.** It looks at the 100 most recently updated
   docs in the collection. An Outline webhook calling a Dagu webhook would make it instant.
 - **The Dagu UI needs protecting** before it's exposed: Cloudflare Access, as for Grafana.
