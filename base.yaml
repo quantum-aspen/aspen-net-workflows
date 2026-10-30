@@ -1,0 +1,3 @@
+# Dagu's base config: defaults every DAG in dags/ inherits. The image installs it as
+# $DAGU_HOME/base.yaml. Nothing yet; without the file, Dagu tries to write a default one
+# into the image and the hermes user can't.

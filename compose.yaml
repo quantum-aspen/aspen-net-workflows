@@ -16,14 +16,19 @@ services:
     env_file: .env
     environment:
       AGENT: ${AGENT:-hermes}
+      DRY_RUN: ${DRY_RUN:-1}  # on unless .env turns it off
       DAGU_AUTH_MODE: none  # the UI only listens on localhost
+      # The image's hermes user takes your uid, so it can read the mounts and you can
+      # read what it writes in .data/. `just up` sets these.
+      HERMES_UID: ${HERMES_UID:-1000}
+      HERMES_GID: ${HERMES_GID:-1000}
     ports:
       - 127.0.0.1:18080:8080
     volumes:
       # Edits to the DAGs and steps apply without a rebuild.
       - ./dags:/opt/workflows/dags:ro
       - ./src:/opt/workflows/src:ro
-      - ./dagu.yaml:/opt/data/dagu/config.yaml:ro
+      - ./dagu.yaml:/opt/dagu/config.yaml:ro
       # Work dirs, would-write/ reports and transcripts, readable from the host.
       - ./.data:/opt/data
     mem_limit: 6g

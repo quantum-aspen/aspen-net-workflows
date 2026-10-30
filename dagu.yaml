@@ -1,5 +1,5 @@
-# Dagu server config. The image points DAGU_HOME at the data volume and DAGU_DAGS_DIR at
-# this repo's dags/. The dev compose.yaml mounts this file the same way.
+# Dagu server config. The image installs it as $DAGU_HOME/config.yaml, where every dagu
+# command finds it; the dev compose.yaml mounts it there, so edits apply on restart.
 tz: America/Denver
 
 # Dagu hands steps only a few variables by default. These are the ones the steps read.

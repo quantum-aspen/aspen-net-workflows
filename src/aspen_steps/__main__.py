@@ -61,9 +61,7 @@ def main(argv: list[str] | None = None) -> int:
 
     wd = cfg.work_dir(args.doc_id)
     if not (wd / "job.json").exists():
-        print(
-            f"no job for {args.doc_id}: {wd / 'job.json'} is missing (the poller writes it)", file=sys.stderr
-        )
+        print(f"no job for {args.doc_id}: {wd / 'job.json'} is missing (claim writes it)", file=sys.stderr)
         return 2
     try:
         if msg := PROGRESS.get(args.step):

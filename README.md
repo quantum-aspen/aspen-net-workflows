@@ -76,6 +76,7 @@ machine's logged-in account, for development).
 ```
 dags/            the workflows
 dagu.yaml        Dagu server config (env passthrough, timezone)
+base.yaml        defaults every DAG inherits (none yet)
 src/aspen_steps/ one command per step: aspen-steps <step> [doc id]
   page.py        the recording-page protocol: link, passcode, tick box, status callout
   meeting.py     poll, claim, context, summarise, publish, status
@@ -127,8 +128,8 @@ ls .data/work/<page id>/would-write/
 
 ## Not done yet
 
-- **Image.** `Dockerfile` is a sketch and hasn't been built. It also needs the Hermes
-  config without the Outline MCP.
+- **Hermes config.** The image builds and runs, but doesn't yet write Hermes' config
+  (Lumen as the model provider, no MCP servers).
 - **Hermes isn't tested.** The prototype's end-to-end run used `AGENT=claude`; `just try`
   uses Hermes, so its first run is the first Hermes test.
 - **`fetch` isn't tested against Zoom** here. It's the skill's unchanged `fetch.sh`.
