@@ -1,5 +1,8 @@
-Paste the Zoom recording's share link below. If it has a passcode, add a line `passcode: …`. Then tick the box.
+:::info
+You can include any other relevant info below then check the “Ready to transcribe” box
+:::
 
-
+* Zoom Link: zoom link
+* Passcode (optional): passcode?
 
 - [ ] Ready to transcribe

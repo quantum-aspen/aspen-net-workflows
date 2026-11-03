@@ -20,13 +20,23 @@ from dataclasses import dataclass
 
 FLAG_TEXT = "Ready to transcribe"
 FLAG = re.compile(rf"^[ \t]*[-*][ \t]+\[(?P<mark>[ xX])\][ \t]+{FLAG_TEXT}\b.*$", re.M | re.I)
-# Its own line, optionally bulleted or bold: "passcode: x", "- **Passcode:** `x`". Not a
-# sentence that mentions one, like the template's instructions.
+# Its own line, optionally bulleted or bold, with an optional note in brackets:
+# "passcode: x", "- **Passcode:** `x`", "* Passcode (optional): x". Not a sentence that
+# mentions one, like the template's instructions.
+# Spaces are any but newlines: Outline leaves no-break spaces around what people type.
 PASSCODE = re.compile(
-    r"^[ \t]*(?:[-*][ \t]+)?\**pass(?:code|word)\**[ \t]*[:=][ \t]*\**[ \t]*(?P<code>\S*)[ \t]*$\n?",
+    r"^[^\S\n]*(?:[-*][^\S\n]+)?\**pass(?:code|word)\**(?:[^\S\n]*\([^)\n]*\))?\**[^\S\n]*[:=]"
+    r"[^\S\n]*\**[^\S\n]*(?P<code>\S*)[^\S\n]*$\n?",
     re.M | re.I,
 )
-LINK = re.compile(r"https://[\w.-]*zoom\.us/rec/(?:share|play)/[^\s)\]>]+")
+# What the template puts where the passcode goes, left as it was when there isn't one.
+PLACEHOLDER = re.compile(r"pass(?:code|word)\??|…|\.\.\.|<code>", re.I)
+# No backslash: Outline writes a Shift+Enter line break as a trailing `\`.
+LINK = re.compile(r"https://[\w.-]*zoom\.us/rec/(?:share|play)/[^\s)\]>\\]+")
+# A markdown link's target, which Outline's formatting (`[__url__](url)`) never touches.
+HREF = re.compile(rf"\]\((?P<url>{LINK.pattern})\)")
+# Outline's markdown backslash-escapes punctuation it could read as syntax ($, #, *, …).
+ESCAPE = re.compile(r"\\([!-/:-@\[-`{-~])")
 STATUS = re.compile(
     r"^:::(?P<kind>\w+)[ \t]*\n[ \t]*\*\*Transcription:\*\*[ \t]*(?P<text>.*?)[ \t]*\n:::[ \t]*$", re.M
 )
@@ -44,14 +54,23 @@ class RecordingPage:
         return bool(self.link) and self.ticked
 
 
+def _passcode(raw: str) -> str:
+    """The passcode as typed, from Outline's markdown of it."""
+    if (len(raw) - len(raw.rstrip("\\"))) % 2:  # an odd one out is a Shift+Enter line break
+        raw = raw[:-1]
+    code = ESCAPE.sub(r"\1", raw.strip("`*_"))
+    return "" if PLACEHOLDER.fullmatch(code) else code
+
+
 def parse(text: str) -> RecordingPage:
-    link = LINK.search(text)
+    href = HREF.search(text)
+    link = href.group("url") if href else (m.group(0) if (m := LINK.search(text)) else None)
     code = PASSCODE.search(text)
     flag = FLAG.search(text)
     status = STATUS.search(text)
     return RecordingPage(
-        link=link.group(0) if link else None,
-        passcode=code.group("code").strip("`*_") if code else "",
+        link=link,
+        passcode=_passcode(code.group("code")) if code else "",
         ticked=bool(flag) and flag.group("mark").lower() == "x",
         status=status.group("text") if status else None,
     )
