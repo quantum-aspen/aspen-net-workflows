@@ -19,8 +19,16 @@ def _hours(spec: str) -> tuple[int, int] | None:
     return start, end
 
 
+def glossary() -> list[str]:
+    """prompts/glossary.txt: terms meetings use that speech-to-text gets wrong."""
+    text = files("aspen_steps").joinpath("prompts/glossary.txt").read_text()
+    return [t.strip() for t in text.splitlines() if t.strip() and not t.startswith("#")]
+
+
 def _vocabulary() -> str:
-    return " ".join(files("aspen_steps").joinpath("prompts/vocabulary.txt").read_text().split())
+    """Whisper's prompt from the glossary, as a sentence: whisper follows a prompt's style,
+    and a bare list (or a list of names) gets written into the transcript as one."""
+    return "An ASPEN-NET meeting about quantum networking: " + ", ".join(glossary()) + "."
 
 
 def in_window(hours: tuple[int, int] | None, now: datetime | None = None) -> bool:

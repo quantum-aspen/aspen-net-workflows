@@ -211,3 +211,25 @@ def test_review_stays_within_its_share_of_the_meeting(tmp_path, monkeypatch):
 def test_whisper_gets_the_glossary_unless_the_env_gives_a_prompt():
     assert "Hong-Ou-Mandel" in Config.from_env({}).asr_prompt
     assert Config.from_env({"TRANSCRIBE_PROMPT": "Just this."}).asr_prompt == "Just this."
+
+
+def test_near_misses_of_glossary_terms_are_flagged():
+    texts = [
+        "we talked about hongol mandal interference",
+        "these modlock lasers at 1550",
+        "Hong-Ou-Mandel interference and mode-locked lasers, spelled right",
+        "the rep rate of the time tagger",
+        "a quantum repeater, separate from the rep at the desk",
+    ]
+    found = review.near_misses(
+        texts, ["Hong-Ou-Mandel", "mode-locked lasers", "rep rate", "time taggers", "quantum repeater"]
+    )
+    assert set(found) == {0, 1}
+    assert "looks like Hong-Ou-Mandel" in found[0] and "looks like mode-locked lasers" in found[1]
+
+
+def test_the_glossary_is_terms_and_whisper_gets_it_as_a_sentence():
+    from aspen_steps.config import glossary
+
+    assert "HOM dip" in glossary() and not any(t.startswith("#") for t in glossary())
+    assert Config.from_env({}).asr_prompt.startswith("An ASPEN-NET meeting about quantum networking: ")

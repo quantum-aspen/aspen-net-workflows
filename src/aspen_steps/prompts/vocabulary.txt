@@ -1,1 +1,0 @@
-An ASPEN-NET meeting about quantum networking: heralded single photons, entanglement swapping, Hong-Ou-Mandel (HOM) interference and the HOM dip, mode-locked lasers, rep rate and carrier-phase locking, femtoseconds and picoseconds of timing jitter, piezo, beam splitter, SNSPDs, time taggers, White Rabbit, NIST and CU Boulder.

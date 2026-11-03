@@ -1,0 +1,23 @@
+# Terms ASPEN-NET meetings use that speech-to-text gets wrong. One per line, spelled as
+# they should be written. They become whisper's vocabulary prompt, and review.py
+# re-checks any passage where Lumen's transcript has a near miss of one ("modlock").
+# Whisper reads only about the last 200 words of its prompt, so keep this short.
+ASPEN-NET
+heralded single photons
+entanglement swapping
+quantum repeater
+Hong-Ou-Mandel
+HOM dip
+mode-locked lasers
+rep rate
+carrier-phase locking
+femtoseconds
+picoseconds
+timing jitter
+piezo
+beam splitter
+SNSPDs
+time taggers
+White Rabbit
+NIST
+CU Boulder

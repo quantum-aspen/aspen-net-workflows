@@ -7,6 +7,8 @@ faster-whisper, which can take a vocabulary prompt, transcribe just those again:
 - One call to a Lumen chat model flags lines that look misheard: a non sequitur, a garbled
   term, an implausible unit. Its guesses at the right words are often wrong, so they're
   only used to pick what to re-check, never as corrections.
+- Words that are a near miss of a term in prompts/glossary.txt ("modlock" for
+  mode-locked) are flagged: the model's read-through varies from run to run, this doesn't.
 - If Zoom made its own transcript (play_info.json's `transcriptList`), it's compared with
   ours chunk by chunk, and chunks where the two disagree on a number are flagged too. That
   catches what reads fine but is wrong ("45" for "40"). Only
@@ -31,12 +33,14 @@ import urllib.request
 from pathlib import Path
 
 from . import asr
-from .config import Config
+from .config import Config, glossary
 from .errors import StepError
 
 FILLERS = set(
     "um uh ah er like so yeah okay ok oh the a an and or but of to in on is it its i you we that this".split()
 )
+# Near misses don't start or end on these: "rep at" isn't a garbled "rep rate".
+EDGES = FILLERS | set("at as by for from with be are was were if then than there here all not no".split())
 TOKEN = re.compile(r"\d+(?:\.\d+)?|[a-z]+")
 SMALL = {w: n for n, w in enumerate(
     "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen "
@@ -136,6 +140,45 @@ def zoom_disagreements(
                 numbers.append(f"{' '.join(mine) or '…'} / {' '.join(zooms) or '…'}")
         if numbers:
             out[i] = "numbers differ from Zoom's: " + "; ".join(numbers)
+    return out
+
+
+def _letters(words: list[str]) -> str:
+    return "".join(words).replace("'", "")
+
+
+def near_misses(texts: list[str], terms: list[str], cutoff: float = 0.8) -> dict[int, str]:
+    """Chunks with a near miss of a glossary term: words that look like it but aren't it
+    ("hongol mandal" for Hong-Ou-Mandel, "modlock" for mode-locked). Words that are
+    themselves a glossary term, or one of a term's words, aren't misses ("repeater")."""
+    known, targets = set(), []
+    for term in terms:
+        words = TOKEN.findall(term.lower().replace("-", " "))
+        known |= {_letters(words).rstrip("s")} | {w.rstrip("s") for w in words if len(w) >= 4}
+        if len(_letters(words)) >= 5:
+            targets.append((term, _letters(words), len(words)))
+    out = {}
+    for i, text in enumerate(texts):
+        words = TOKEN.findall(text.lower().replace("-", " "))
+        hits = set()
+        for term, letters, n in targets:
+            for size in {max(n - 1, 1), n, n + 1}:
+                for k in range(len(words) - size + 1):
+                    window = words[k : k + size]
+                    got = _letters(window)
+                    a, b = got.rstrip("s"), letters.rstrip("s")
+                    if (
+                        b in a or a in b  # the term itself, with a word either side, or part of it
+                        or a in known
+                        or got[0] != letters[0]
+                        or window[0] in EDGES or window[-1] in EDGES
+                        or abs(len(got) - len(letters)) > 4
+                    ):  # fmt: skip
+                        continue
+                    if difflib.SequenceMatcher(None, got, letters).ratio() >= cutoff:
+                        hits.add(f"{' '.join(window)!r} looks like {term}")
+        if hits:
+            out[i] = "; ".join(sorted(hits))
     return out
 
 
@@ -265,6 +308,11 @@ def review(cfg: Config, wd: Path) -> None:
         print(f"Zoom's transcript disagrees in {len(found)} chunks", flush=True)
         for i, reason in found.items():
             why.setdefault(i, []).append(reason)
+
+    found = near_misses(texts, glossary())
+    print(f"near misses of glossary terms in {len(found)} chunks", flush=True)
+    for i, reason in found.items():
+        why.setdefault(i, []).append(reason)
 
     # Numbers first, then the rest, until the re-check reaches its share of the meeting.
     order = sorted(why, key=lambda i: (not any("numbers" in r for r in why[i]), i))
