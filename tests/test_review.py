@@ -24,7 +24,7 @@ def test_tokens_drop_fillers_and_split_hyphens():
         "femtosecond",
         "lock",
         "0.6",
-        "fs",
+        "femtosecond",
     ]
 
 
@@ -44,8 +44,7 @@ def test_zoom_disagreement_on_a_number_is_flagged():
     )
     found = review.zoom_disagreements(SPANS, TEXTS, zoom)
     assert "45 / 40" in found[1]
-    assert found[0] == "3 words differ from Zoom's"  # modlock / mode locked
-    assert 2 not in found
+    assert set(found) == {1}  # "modlock / mode locked" is left to the model
 
 
 def test_zoom_agreeing_or_differing_only_at_the_edges_isnt_flagged():
@@ -64,16 +63,27 @@ def test_zoom_agreeing_or_differing_only_at_the_edges_isnt_flagged():
     assert review.zoom_disagreements(SPANS[1:2], TEXTS[1:2], zoom) == {}
 
 
-def test_several_differing_words_are_flagged():
+def test_numbers_and_units_are_compared_as_values():
+    assert review.tokens("one GHz, twenty five femtoseconds, a hundred and 100 ps") == [
+        "1", "gigahertz", "25", "femtosecond", "100", "100", "picosecond",
+    ]  # fmt: skip
     zoom = review.zoom_words(
         {
             "transcriptList": [
-                zoom_row("00:00:00.000", "00:00:30.000", "So we have these mode-locked fibre lasers at 1550.")
+                zoom_row(
+                    "00:00:00.000", "00:00:30.000", "So we have these mode-locked lasers at fifteen fifty."
+                )
             ]
         }
     )
-    found = review.zoom_disagreements(SPANS[:1], TEXTS[:1], zoom)
-    assert found == {0: "4 words differ from Zoom's"}
+    # "fifteen fifty" isn't 1550 to this, but it's spoken that way rarely enough to re-check
+    assert set(
+        review.zoom_disagreements(SPANS[:1], ["So we have these mode-locked lasers at 1 GHz."], zoom)
+    ) == {0}
+    agree = review.zoom_words(
+        {"transcriptList": [zoom_row("00:00:00.000", "00:00:30.000", "measuring at one gigahertz now")]}
+    )
+    assert review.zoom_disagreements(SPANS[:1], ["measuring at 1 GHz now"], agree) == {}
 
 
 def test_suspects_are_parsed_from_a_chatty_answer():
@@ -161,8 +171,8 @@ def test_review_rechecks_flagged_chunks_and_keeps_the_original(tmp_path, monkeyp
     )
     review.review(cfg, wd)
 
-    assert calls["idxs"] == [0, 1]
-    assert calls["prompt"] == "Terms: femtoseconds. People: Michael Raymer."
+    assert calls["idxs"] == [0, 1]  # 0 from the model, 1 from Zoom's 40
+    assert calls["prompt"] == "Terms: femtoseconds."  # no names: whisper writes them in as labels
     text = (wd / "transcript.txt").read_text()
     assert "40 femtosecond" in text and "mode-locked" in text and "Thanks, everyone." in text
     assert "45 femtosecond" in (wd / "transcript.granite.txt").read_text()
@@ -196,3 +206,8 @@ def test_review_stays_within_its_share_of_the_meeting(tmp_path, monkeypatch):
         Config.from_env({"TRANSCRIBER": "lumen", "AGENT_MODEL": "m", "REVIEW_MAX_SHARE": "0.5"}), wd
     )
     assert sum(SPANS[i][1] - SPANS[i][0] for i in seen["idxs"]) <= 40
+
+
+def test_whisper_gets_the_glossary_unless_the_env_gives_a_prompt():
+    assert "Hong-Ou-Mandel" in Config.from_env({}).asr_prompt
+    assert Config.from_env({"TRANSCRIBE_PROMPT": "Just this."}).asr_prompt == "Just this."

@@ -3,6 +3,7 @@
 import os
 from dataclasses import dataclass
 from datetime import datetime
+from importlib.resources import files
 from pathlib import Path
 
 from pydantic import SecretStr
@@ -16,6 +17,10 @@ def _hours(spec: str) -> tuple[int, int] | None:
     if not (0 <= start < 24 and 0 <= end <= 24):
         raise ValueError(f"RUN_HOURS out of range: {spec}")
     return start, end
+
+
+def _vocabulary() -> str:
+    return " ".join(files("aspen_steps").joinpath("prompts/vocabulary.txt").read_text().split())
 
 
 def in_window(hours: tuple[int, int] | None, now: datetime | None = None) -> bool:
@@ -93,7 +98,8 @@ class Config:
             lumen_vision_model=e.get("LUMEN_VISION_MODEL", ""),
             asr_chunk_seconds=float(e.get("ASR_CHUNK_SECONDS", "30")),
             asr_concurrency=int(e.get("ASR_CONCURRENCY", "4")),
-            asr_prompt=e.get("TRANSCRIBE_PROMPT", ""),
+            # Whisper's vocabulary hint: the checked-in glossary unless the env gives one.
+            asr_prompt=e.get("TRANSCRIBE_PROMPT") or _vocabulary(),
             whisper_threads=int(e.get("TRANSCRIBE_THREADS", "4")),
             review=e.get("REVIEW", "auto"),
             # The Lumen model that reads the transcript for misheard lines; hermes' by default.

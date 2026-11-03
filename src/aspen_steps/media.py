@@ -75,7 +75,7 @@ def transcribe(cfg: Config, wd: Path) -> None:
         return asr.transcribe(cfg, wd)
     if cfg.transcriber != "whisper":
         raise StepError(f"TRANSCRIBER={cfg.transcriber!r}; expected whisper or lumen")
-    env = {"HF_HOME": str(cfg.data_dir / "hf")}
+    env = {"HF_HOME": str(cfg.data_dir / "hf"), "TRANSCRIBE_PROMPT": cfg.asr_prompt}
     _run(
         [
             sys.executable,

@@ -8,18 +8,20 @@ faster-whisper, which can take a vocabulary prompt, transcribe just those again:
   term, an implausible unit. Its guesses at the right words are often wrong, so they're
   only used to pick what to re-check, never as corrections.
 - If Zoom made its own transcript (play_info.json's `transcriptList`), it's compared with
-  ours chunk by chunk, and chunks where the two disagree on numbers or on several real
-  words are flagged too. That catches what reads fine but is wrong ("45" for "40"). Only
+  ours chunk by chunk, and chunks where the two disagree on a number are flagged too. That
+  catches what reads fine but is wrong ("45" for "40"). Only
   Zoom's text is used: its speaker labels are the account that spoke, and at in-person
   meetings one account carries a whole room.
 
 Whisper re-transcribes whole chunks, which asr.py cut at pauses, so each one's text swaps
-in cleanly. The vocabulary prompt is TRANSCRIBE_PROMPT plus the names on the team roster.
+in cleanly, with TRANSCRIBE_PROMPT as its vocabulary. Names stay out of that prompt: given a
+list of names, whisper starts writing them in as speaker labels.
 The transcript Lumen made is kept as transcript.granite.*, and review.json records what
 was flagged and what changed."""
 
 import difflib
 import json
+import logging
 import re
 import shutil
 import subprocess
@@ -36,16 +38,29 @@ FILLERS = set(
     "um uh ah er like so yeah okay ok oh the a an and or but of to in on is it its i you we that this".split()
 )
 TOKEN = re.compile(r"\d+(?:\.\d+)?|[a-z]+")
-# Disagreeing with Zoom on this many real words in one chunk is worth a re-check.
-ZOOM_WORDS = 3
+SMALL = {w: n for n, w in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen "
+    "sixteen seventeen eighteen nineteen".split())}  # fmt: skip
+TENS = {
+    w: 10 * n
+    for n, w in enumerate("_ _ twenty thirty forty fifty sixty seventy eighty ninety".split())
+    if n > 1
+}
+SCALES = {"hundred": 100, "thousand": 1000, "million": 10**6}
+UNITS = {
+    "ghz": "gigahertz", "mhz": "megahertz", "khz": "kilohertz", "hz": "hertz", "fs": "femtosecond",
+    "ps": "picosecond", "ns": "nanosecond", "ms": "millisecond", "nm": "nanometer", "db": "decibel",
+}  # fmt: skip
+
 
 FLAG_PROMPT = """Below is a machine transcript of an ASPEN-NET meeting ($series). ASPEN-NET is a \
 quantum-networking research collaboration. People who may be mentioned: $names.
 
 The speech recogniser sometimes mishears technical terms, names, units and numbers. List \
 every line where a word or phrase looks misheard: a non sequitur, a garbled technical term \
-or name, or an implausible number or unit for what's being discussed. Don't flag ordinary \
-disfluency (um, like, false starts, repeated words).
+or name, or an implausible number or unit for what's being discussed. Only flag words that \
+are likely wrong: not missing units or punctuation, odd grammar, or ordinary disfluency \
+(um, like, false starts, repeated words).
 
 Answer with JSON only:
 {"suspects": [{"at": "H:MM:SS", "heard": "<the suspicious words, exactly as written>", \
@@ -55,9 +70,31 @@ Transcript:
 $transcript"""
 
 
+def _numbers(words: list[str]) -> list[str]:
+    """Spelled-out numbers as digits ("twenty five" -> "25", "one hundred" -> "100"), and
+    unit abbreviations and plurals as one word, so "one GHz" and "1 gigahertz" agree."""
+    out, value = [], None
+    for w in [*words, ""]:
+        n = SMALL.get(w, TENS.get(w))
+        if n is not None and (value is None or value % 100 >= 20 or n >= 20 or value % 100 == 0):
+            value = n if value is None else value + n
+        elif w in SCALES and value is not None:
+            value *= SCALES[w]
+        else:
+            if value is not None:
+                out.append(str(value))
+                value = None
+            if w:
+                w = UNITS.get(w, w)
+                out.append(w[:-1] if w.endswith("s") and w[:-1] in {*UNITS.values(), "second"} else w)
+    return out
+
+
 def tokens(text: str) -> list[str]:
-    """Words for comparing transcripts: lowercase, hyphens split, fillers dropped."""
-    return [t for t in TOKEN.findall(text.lower().replace("-", " ")) if t not in FILLERS]
+    """Words for comparing transcripts: lowercase, hyphens split, numbers and units
+    normalised, fillers dropped."""
+    text = re.sub(r"\ba (hundred|thousand|million)\b", r"one \1", text.lower().replace("-", " "))
+    return [t for t in _numbers(TOKEN.findall(text)) if t not in FILLERS]
 
 
 def _secs(ts: str) -> float:
@@ -79,8 +116,10 @@ def zoom_words(play_info: dict) -> list[tuple[float, str]]:
 def zoom_disagreements(
     spans: list[tuple[float, float]], texts: list[str], zoom: list[tuple[float, str]], slop: float = 1.5
 ) -> dict[int, str]:
-    """Chunks where our transcript and Zoom's differ on a number or on ZOOM_WORDS real words.
-    Words missing at a chunk's edges don't count: the two transcripts' timings differ."""
+    """Chunks where our transcript and Zoom's differ on a number: what reads fine but may be
+    wrong ("45" for "40"), which the model's read-through can't see. Other differences are
+    left to the model: Zoom mishears words too, so they're mostly noise. Words missing at a
+    chunk's edges don't count, since the two transcripts' timings differ."""
     out = {}
     for i, ((a, b), text) in enumerate(zip(spans, texts, strict=True)):
         ours = tokens(text)
@@ -88,18 +127,15 @@ def zoom_disagreements(
         if not ours or not theirs:
             continue
         ops = difflib.SequenceMatcher(None, ours, theirs, autojunk=False).get_opcodes()
-        numbers, words = [], 0
+        numbers = []
         for k, (op, i1, i2, j1, j2) in enumerate(ops):
             if op == "equal" or (op != "replace" and k in (0, len(ops) - 1)):
                 continue
             mine, zooms = ours[i1:i2], theirs[j1:j2]
-            if any(t[0].isdigit() for t in mine + zooms):
+            if sorted(t for t in mine if t[0].isdigit()) != sorted(t for t in zooms if t[0].isdigit()):
                 numbers.append(f"{' '.join(mine) or '…'} / {' '.join(zooms) or '…'}")
-            words += sum(len(t) >= 4 for t in mine + zooms)
         if numbers:
             out[i] = "numbers differ from Zoom's: " + "; ".join(numbers)
-        elif words >= ZOOM_WORDS:
-            out[i] = f"{words} words differ from Zoom's"
     return out
 
 
@@ -153,22 +189,12 @@ def chunk_for(suspect: dict, spans: list[tuple[float, float]], texts: list[str])
     return max(near, key=lambda k: (len(heard & set(tokens(texts[k]))), k == i))
 
 
-def vocabulary(cfg: Config, wd: Path) -> str:
-    """Whisper's prompt: TRANSCRIBE_PROMPT, then the roster's names. Whisper reads only the
-    end of a long prompt, so it's kept short."""
-    names = []
-    team = wd / "context" / "team.json"
-    if team.exists():
-        names = [u["name"] for u in json.loads(team.read_text())]
-    parts = [cfg.asr_prompt.strip()] if cfg.asr_prompt.strip() else []
-    if names:
-        parts.append("People: " + ", ".join(names) + ".")
-    return " ".join(parts)[-800:]
-
-
 def recheck(cfg: Config, wd: Path, spans: list[tuple[float, float]], idxs: list[int], prompt: str) -> dict:
     """Whisper's segments for each chunk in idxs, timed in the recording."""
     from faster_whisper import WhisperModel  # the image has it; tests don't need it
+
+    for name in ("faster_whisper", "httpx"):  # a line per chunk otherwise
+        logging.getLogger(name).setLevel(logging.WARNING)
 
     t0 = time.time()
     model = WhisperModel(
@@ -252,7 +278,7 @@ def review(cfg: Config, wd: Path) -> None:
     chosen.sort()
     print(f"re-checking {len(chosen)} of {len(spans)} chunks ({seconds:.0f}s, {seconds / max(total, 1):.0%})")
 
-    replaced = recheck(cfg, wd, spans, chosen, vocabulary(cfg, wd)) if chosen else {}
+    replaced = recheck(cfg, wd, spans, chosen, cfg.asr_prompt.strip()) if chosen else {}
     for ext in (".txt", ".srt"):
         kept = wd / f"transcript.granite{ext}"
         if not kept.exists():

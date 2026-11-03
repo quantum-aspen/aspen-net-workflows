@@ -88,8 +88,6 @@ def _audio(wav: Path, start: float, end: float, tmp: Path) -> bytes:
 def _post(cfg: Config, audio: bytes) -> str:
     boundary = uuid.uuid4().hex
     fields = [("model", cfg.lumen_asr_model), ("response_format", "json")]
-    if cfg.asr_prompt:
-        fields.append(("prompt", cfg.asr_prompt))
     body = b"".join(
         f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
         for k, v in fields
