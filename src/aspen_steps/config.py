@@ -46,9 +46,8 @@ class Config:
     outline_api_key: SecretStr
     meetings_collection: str
     data_dir: Path
-    skill_dir: Path
     whisper_model: str
-    # "whisper" runs the skill's transcribe.py locally; "lumen" sends the audio to
+    # "whisper" runs scripts/transcribe.py locally; "lumen" sends the audio to
     # Lumen's speech model (asr.py).
     transcriber: str
     lumen_base_url: str
@@ -78,6 +77,12 @@ class Config:
         return self.data_dir / "work"
 
     @property
+    def scripts_dir(self) -> Path:
+        """The meeting scripts: download, transcription, chat, frames. Plain files in the
+        package, so the agent can run `frames.py` too."""
+        return Path(str(files("aspen_steps").joinpath("scripts")))
+
+    @property
     def meetings_dir(self) -> Path:
         return self.data_dir / "meetings"
 
@@ -97,7 +102,6 @@ class Config:
             outline_api_key=SecretStr(e.get("OUTLINE_API_KEY", "")),
             meetings_collection=e.get("MEETINGS_COLLECTION_ID", ""),
             data_dir=Path(e.get("DATA_DIR", "/opt/data")),
-            skill_dir=Path(e.get("SKILL_DIR", "/opt/skills/local-meeting-transcript")),
             whisper_model=e.get("WHISPER_MODEL", "large-v3-turbo"),
             transcriber=e.get("TRANSCRIBER", "whisper"),
             lumen_base_url=e.get("LUMEN_BASE_URL", "https://lumen.ncsa.illinois.edu/v1").rstrip("/"),

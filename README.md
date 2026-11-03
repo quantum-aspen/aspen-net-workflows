@@ -82,13 +82,16 @@ base.yaml        defaults every DAG inherits (none yet)
 src/aspen_steps/ one command per step: aspen-steps <step> [doc id]
   page.py        the recording-page protocol: link, passcode, tick box, status callout
   meeting.py     poll, claim, context, summarise, publish, status
-  media.py       fetch, transcribe, frames (the local-meeting-transcript skill's scripts)
+  media.py       fetch, transcribe, frames: runs scripts/
   asr.py         transcription on Lumen's speech model, in timed chunks
   review.py      re-checks a Lumen transcript's misheard-looking chunks with whisper
   agent.py       unattended agent runs, hermes or claude
   check.py       the agent's output shape and the checks it must pass
   outline.py     the wiki API, and the dry run: writes recorded, not made
-  prompts/       the summary prompt
+  prompts/       the summary prompt, its rules (summary-rules.md, chat-commands.md) and
+                 whisper's glossary
+  scripts/       download (fetch.sh), whisper, chat, frames: from the
+                 local-meeting-transcript skill once, now this repo's own
 templates/       the Meeting recording template, to add to the wiki by hand
 tests/           pytest on the steps' own logic, with a checked-in work dir
 ```
@@ -122,9 +125,8 @@ ls .data/would-write/<page id>/
 | `OUTLINE_URL`, `OUTLINE_API_KEY` | wiki.quantum-aspen.net | the bot's key; steps only |
 | `MEETINGS_COLLECTION_ID` | | |
 | `DATA_DIR` | `/opt/data` | `work/<doc id>/`, `meetings/`, `hf/` |
-| `SKILL_DIR` | `/opt/skills/local-meeting-transcript` | |
-| `TRANSCRIBER` | `whisper` | `whisper`: the skill's `transcribe.py`, locally. `lumen`: Lumen's speech model, in timed chunks (`asr.py`) |
-| `WHISPER_MODEL` | `large-v3-turbo` | `TRANSCRIBE_*` as in the skill's `transcribe.py` |
+| `TRANSCRIBER` | `whisper` | `whisper`: `scripts/transcribe.py`, locally. `lumen`: Lumen's speech model, in timed chunks (`asr.py`) |
+| `WHISPER_MODEL` | `large-v3-turbo` | `TRANSCRIBE_*` as in `scripts/transcribe.py` |
 | `LUMEN_BASE_URL`, `LUMEN_API_KEY` | lumen.ncsa.illinois.edu/v1 | for Hermes, and for `TRANSCRIBER=lumen` |
 | `LUMEN_ASR_MODEL` | | e.g. `granite-speech-4.1-2b-plus` |
 | `LUMEN_VISION_MODEL` | | e.g. `gemma-4-31b-it`; without it the agent has no vision tool |
@@ -150,7 +152,6 @@ ls .data/would-write/<page id>/
   Zoom's own transcript when there is one. Of the model's flags only numbers and units
   are re-checked. On the test meeting that's 24% of it, and it fixed all of them in about
   3 min, against 7.3 min for whisper on everything (4 CPU cores). Timestamps are per chunk.
-- **`fetch` isn't tested against Zoom** here. It's the skill's unchanged `fetch.sh`.
 - **The real wiki is untested.** The prototype checked its Outline calls against a mock.
   A dry run covers the reads (`templates.list` and `collections.documents` are the ones to
   watch); attachment upload only runs for real.

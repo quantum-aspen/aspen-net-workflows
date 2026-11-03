@@ -20,6 +20,7 @@ reads chat.json, since people won't use one fixed vocabulary.
 Sender names come from Zoom, so they're reliable attribution, unlike
 diarization. Only messages sent to everyone are in the recording.
 """
+
 import json
 import re
 import sys
@@ -48,13 +49,15 @@ def main():
         text = (m.get("content") or "").strip()
         t = round((m["time"] - start) / 1000, 1)
         cmd = COMMAND.match(text)
-        messages.append({
-            "t": t,
-            "at": hms(t),
-            "sender": m.get("senderName"),
-            "text": text,
-            "command": cmd.group(1).strip() if cmd else None,
-        })
+        messages.append(
+            {
+                "t": t,
+                "at": hms(t),
+                "sender": m.get("senderName"),
+                "text": text,
+                "command": cmd.group(1).strip() if cmd else None,
+            }
+        )
     messages.sort(key=lambda m: m["t"])
 
     (out / "chat.json").write_text(json.dumps(messages, indent=1))

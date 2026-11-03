@@ -6,18 +6,25 @@ Usage: python clean_transcript.py <transcript.srt> <out.md> [window_seconds]
 window_seconds groups consecutive segments into a paragraph until that many
 seconds of audio have accumulated (default 45).
 """
-import datetime, re, sys
+
+import datetime
+import re
+import sys
 
 srt_path = sys.argv[1] if len(sys.argv) > 1 else "transcript.srt"
 out = sys.argv[2] if len(sys.argv) > 2 else "transcript-clean.md"
 window = float(sys.argv[3]) if len(sys.argv) > 3 else 45.0
 
+
 def ts(s):
     return str(datetime.timedelta(seconds=int(s)))
 
+
 def p(t):
-    h, mn, rest = t.split(":"); s, ms = rest.split(",")
-    return int(h)*3600 + int(mn)*60 + int(s) + int(ms)/1000
+    h, mn, rest = t.split(":")
+    s, ms = rest.split(",")
+    return int(h) * 3600 + int(mn) * 60 + int(s) + int(ms) / 1000
+
 
 blocks, cur = [], []
 for line in open(srt_path):

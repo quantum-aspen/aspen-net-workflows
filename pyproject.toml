@@ -10,8 +10,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# What the meeting workflow's media steps need: the local-meeting-transcript
-# skill's scripts run in this environment. The image installs it; tests don't.
+# What the meeting workflow's media steps need: src/aspen_steps/scripts/ run in this
+# environment. The image installs it; tests don't.
 media = [
     "faster-whisper==1.2.1",
     # faster-whisper 1.2.1 passes av.open(metadata_errors=...), which PyAV 19 removed.

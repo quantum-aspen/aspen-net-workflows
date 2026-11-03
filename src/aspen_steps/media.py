@@ -1,4 +1,4 @@
-"""Download, transcribe, and pull chat and frames: the skill's scripts, no model involved.
+"""Download, transcribe, and pull chat and frames: scripts/, no model involved.
 
 Each step skips itself if its output already exists, so a retried or re-ticked run
 picks up where the last one stopped."""
@@ -18,7 +18,7 @@ RETICK = "add `passcode: …` to the page and tick the box again"
 
 
 def _run(cmd: list[str], wd: Path, env: dict | None = None, timeout: int = 3600) -> None:
-    """Runs one skill script with its output going to the step's log (stdout)."""
+    """Runs one script with its output going to the step's log (stdout)."""
     print("$", " ".join(cmd), flush=True)
     p = subprocess.run(
         cmd,
@@ -56,7 +56,7 @@ def fetch(cfg: Config, wd: Path) -> None:
     passcode = secret.read_text().strip() if secret.exists() else ""
     try:
         _run(
-            ["sh", str(cfg.skill_dir / "scripts" / "fetch.sh"), job(wd)["url"], str(wd)],
+            ["sh", str(cfg.scripts_dir / "fetch.sh"), job(wd)["url"], str(wd)],
             wd,
             env={"ZOOM_PASSCODE": passcode} if passcode else None,
             timeout=2400,
@@ -81,7 +81,7 @@ def transcribe(cfg: Config, wd: Path) -> None:
     _run(
         [
             sys.executable,
-            str(cfg.skill_dir / "scripts" / "transcribe.py"),
+            str(cfg.scripts_dir / "transcribe.py"),
             "meeting.wav",
             cfg.whisper_model,
             "transcript",
@@ -97,7 +97,7 @@ def frames(cfg: Config, wd: Path) -> None:
     are what people ask for. A frame at every screen change (`frames.py scenes`) would leave
     the agent dozens of slides to look through. It takes its own with `frames.py at` only
     when the discussion is plainly about something on screen."""
-    script = [sys.executable, str(cfg.skill_dir / "scripts" / "frames.py")]
+    script = [sys.executable, str(cfg.scripts_dir / "frames.py")]
     video = wd / ("share.mp4" if (wd / "share.mp4").exists() else "meeting.mp4")
     if video.exists() and (wd / "chat.json").exists() and not (wd / "frames" / "commands.json").exists():
         _run([*script, "commands", video.name, "chat.json", "frames"], wd)

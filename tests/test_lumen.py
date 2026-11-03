@@ -26,7 +26,7 @@ def test_sentences_share_their_chunk_by_length():
     assert asr.segments("", 0, 30) == []
 
 
-def test_transcript_matches_the_skills_format(tmp_path):
+def test_transcript_matches_whispers_format(tmp_path):
     n = asr.write([(0, 2.5, "Hi."), (3661.25, 3662, "Bye.")], tmp_path / "transcript")
     assert n == 2
     assert (tmp_path / "transcript.txt").read_text() == "[0:00:00] Hi.\n[1:01:01] Bye.\n"

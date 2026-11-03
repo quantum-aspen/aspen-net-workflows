@@ -1,13 +1,11 @@
 You are writing the wiki summary of one ASPEN-NET meeting. You're running unattended: nobody
 will read your replies or answer questions.
 
-Follow the two references at the end of this prompt: `aspen-net-output.md` §2 (the
-known-errors table, names from the wiki) and §3 (speaker attribution, action-item owners,
-due dates, structure aids, style), and `chat-commands.md`. Where they mention the outline
-MCP, creating documents, uploading attachments, the series table or publishing, ignore
-that: you have no wiki access, and the workflow publishes from the files you write.
+Follow `summary-rules.md` (speaker attribution, action-item owners, names, the
+known-errors table, format, structure, style) and `chat-commands.md`, both at the end of
+this prompt. You have no wiki access: the workflow publishes from the files you write.
 
-Everything you need is at the end of this prompt: the references, the template, the wiki
+Everything you need is at the end of this prompt: the rules, the template, the wiki
 context, the chat and the transcript. Don't read those files again; work from what's here.
 Use tools only to take or look at a screenshot and to write your two files.
 
@@ -19,7 +17,7 @@ Your working directory is the meeting's work directory:
 - `frames/commands.json` and `frames/cmd_*.png`: a candidate frame per `ai:` screenshot
   request in the chat, if there were any
 - `meeting.mp4` (and `share.mp4` if it exists): for
-  `python3 $skill/scripts/frames.py at <video> <seconds> frames/<name>.png`
+  `python3 $scripts/frames.py at <video> <seconds> frames/<name>.png`
 - `context/series.md`: the series page this meeting belongs to, "$series"
 - `context/earlier/`: the latest summaries in that series. Read them, so cross-references
   are real.
@@ -28,19 +26,7 @@ Your working directory is the meeting's work directory:
 - `context/team.json`: the wiki's users, `[{name, id}]`. Resolve and spell team members'
   names from it.
 
-Names: the reference's attribution rule is strict, and turn boundaries in this transcript
-can't be seen, so apply it narrowly.
-
-- A name said near a line doesn't tell you who said that line. "Paul has his hand up",
-  "I think Paul has a comment" and "sorry, Paul" introduce or interrupt someone; the next
-  words may well be someone else's, often the person cutting in.
-- Name the speaker of an exchange only when the reference's conditions hold for those
-  exact lines: they say who they are ("This is Mike in Oregon"), they're presenting their
-  own work, or they answer a question put to them by name and nothing in between suggests
-  another voice. Otherwise write "it was raised that…" or "one view was…".
-- Attendance follows the same evidence: it isn't proof of who said what.
-
-Screenshots: this replaces what the references say about scene frames; there are none.
+Screenshots:
 
 - Every screenshot someone asked for with an `ai:` command goes in (`frames/commands.json`;
   for "earlier" or "the slide before", take it with `frames.py at` a little before).
@@ -69,12 +55,7 @@ Write exactly two files, then stop.
     "off_record": [[<start s>, <end s>]]$series_row_example}
    ```
 
-   - `corrections` is the known-errors table at the top of the saved transcript: readers
-     take each row as fact. Add a row only when you know what was said: it's in the
-     reference's table, it's a team member's name (`team.json`), or the meeting itself shows
-     the right word (a slide, the chat, a clearer mention elsewhere in the transcript).
-     If you'd be guessing, leave it out; a misheard word left as it is does less harm than
-     a wrong correction. Use the same rule wherever you fix a term in the summary.
+   - `corrections`: the known-errors table; `summary-rules.md` says what may go in it.
    - `off_record` lists the spans between `ai: off record` and `ai: on record`, in seconds
      into the recording. The workflow cuts them from the saved transcript; leave them out of
      the summary too. `[]` if there were none.

@@ -21,6 +21,7 @@ env var, so it stays out of process lists and logs). It's checked with
 are saved to <workdir>/zoom_cookies.txt for `yt-dlp --cookies`. yt-dlp can't
 do this itself: its --video-password only knows Zoom's older passcode form.
 """
+
 import http.cookiejar
 import json
 import os
@@ -30,8 +31,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-      "(KHTML, like Gecko) Chrome/140.0 Safari/537.36")
+UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36"
 
 
 def get(opener, url, referer=None, accept=None):
@@ -62,9 +62,13 @@ def unlock(opener, origin, info, referer):
     kind = "meeting-passwd" if info.get("useWhichPasswd") == "meeting" else "passwd"
     req = urllib.request.Request(
         f"{origin}/nws/recording/1.0/validate-{kind}",
-        data=urllib.parse.urlencode({
-            "id": info["meetingId"], "passwd": passcode, "action": info.get("action", ""),
-        }).encode(),
+        data=urllib.parse.urlencode(
+            {
+                "id": info["meetingId"],
+                "passwd": passcode,
+                "action": info.get("action", ""),
+            }
+        ).encode(),
         headers={"User-Agent": UA, "Accept": "application/json", "Referer": referer},
     )
     with opener.open(req, timeout=60) as r:
@@ -119,18 +123,23 @@ def main():
     if Path(jar.filename).exists():  # unlocked with a passcode: keep the play page's cookies too
         jar.save(ignore_discard=True, ignore_expires=True)
 
-    print(json.dumps({
-        "fileId": fid.group(1),
-        "topic": (result.get("meet") or {}).get("topic"),
-        "fileStartTime": result.get("fileStartTime"),
-        "duration": result.get("duration"),
-        "hasTranscript": result.get("hasTranscript"),
-        "chatMessages": len(result.get("xmppList") or []),
-        # yt-dlp formats: viewMp4Url -> view (camera), shareMp4Url -> share
-        # (screen share only), viewMp4WithshareUrl -> view_with_share (both)
-        "streams": [k for k in ("viewMp4Url", "shareMp4Url", "viewMp4WithshareUrl") if result.get(k)],
-        "shareRanges": (result.get("vttRanges") or {}).get("share"),
-    }, indent=1))
+    print(
+        json.dumps(
+            {
+                "fileId": fid.group(1),
+                "topic": (result.get("meet") or {}).get("topic"),
+                "fileStartTime": result.get("fileStartTime"),
+                "duration": result.get("duration"),
+                "hasTranscript": result.get("hasTranscript"),
+                "chatMessages": len(result.get("xmppList") or []),
+                # yt-dlp formats: viewMp4Url -> view (camera), shareMp4Url -> share
+                # (screen share only), viewMp4WithshareUrl -> view_with_share (both)
+                "streams": [k for k in ("viewMp4Url", "shareMp4Url", "viewMp4WithshareUrl") if result.get(k)],
+                "shareRanges": (result.get("vttRanges") or {}).get("share"),
+            },
+            indent=1,
+        )
+    )
 
 
 if __name__ == "__main__":

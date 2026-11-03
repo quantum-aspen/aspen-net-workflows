@@ -1,4 +1,4 @@
-"""Transcription on Lumen's speech model, in place of the skill's local whisper.
+"""Transcription on Lumen's speech model, in place of local whisper (scripts/transcribe.py).
 
 Lumen's ASR model (granite-speech) returns text only: no `verbose_json`, so no
 timestamps. To get them back, the audio goes up in chunks of about ASR_CHUNK_SECONDS,
@@ -7,8 +7,8 @@ chunk sits in the recording. Within a chunk, sentences are spread over its span 
 length. Timestamps are good to a chunk, roughly, which is enough for the summary's
 references and for cutting off-the-record spans.
 
-Writes transcript.txt and transcript.srt in the same format as the skill's
-transcribe.py. Each chunk's text is kept in asr/ as it arrives, so a retried step
+Writes transcript.txt and transcript.srt in the same format as
+scripts/transcribe.py. Each chunk's text is kept in asr/ as it arrives, so a retried step
 only sends the chunks it hasn't got yet."""
 
 import json

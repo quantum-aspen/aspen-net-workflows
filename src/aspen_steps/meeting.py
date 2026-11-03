@@ -186,7 +186,7 @@ def _prompt(cfg: Config, wd: Path) -> str:
     )
     text = files("aspen_steps").joinpath("prompts/meeting-summary.md").read_text()
     return Template(text).substitute(
-        skill=cfg.skill_dir,
+        scripts=cfg.scripts_dir,
         wd=wd.resolve(),
         series=job["series"],
         url=job["url"],
@@ -199,10 +199,10 @@ def _prompt(cfg: Config, wd: Path) -> str:
 def _materials(cfg: Config, wd: Path) -> str:
     """The files the agent needs, inlined after the instructions, so it spends no turns
     reading them. Each turn on Lumen takes 15-100 s, and the first run spent a dozen on this."""
-    refs = cfg.skill_dir / "references"
+    prompts = files("aspen_steps").joinpath("prompts")
     files_ = [
-        (refs / "aspen-net-output.md", "aspen-net-output.md"),
-        (refs / "chat-commands.md", "chat-commands.md"),
+        (prompts.joinpath("summary-rules.md"), "summary-rules.md"),
+        (prompts.joinpath("chat-commands.md"), "chat-commands.md"),
         (wd / "context" / "template.md", "context/template.md"),
         (wd / "context" / "series.md", "context/series.md"),
         (wd / "context" / "team.json", "context/team.json"),
@@ -229,9 +229,9 @@ def summarise(cfg: Config, wd: Path, attempts: int = 2) -> None:
     (wd / "out" / "result.json").unlink(missing_ok=True)
     original = _prompt(cfg, wd) + "\n\n" + _materials(cfg, wd)
     prompt = original
-    frames_at = f"python3 {cfg.skill_dir}/scripts/frames.py at"
+    frames_at = f"python3 {cfg.scripts_dir}/frames.py at"
     for attempt in range(1, attempts + 1):
-        rc = agent.run(cfg, prompt, wd, read_dirs=[cfg.skill_dir], commands=[frames_at])
+        rc = agent.run(cfg, prompt, wd, read_dirs=[cfg.scripts_dir], commands=[frames_at])
         try:
             result, summary = check.load(wd)
             found = check.problems(wd, result, summary, mentions=cfg.mentions)
@@ -302,7 +302,7 @@ def _transcript_folder(cfg: Config, wd: Path, result: check.Result, title: str, 
     subprocess.run(
         [
             sys.executable,
-            str(cfg.skill_dir / "scripts" / "clean_transcript.py"),
+            str(cfg.scripts_dir / "clean_transcript.py"),
             str(out / "transcript.srt"),
             str(clean),
         ],

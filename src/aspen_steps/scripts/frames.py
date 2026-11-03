@@ -20,6 +20,7 @@ for one, or for a moment the discussion clearly needs, never in bulk.
 yt-dlp format `share`), else meeting.mp4. Times are seconds into
 the recording, matching chat.py's `t`. Needs ffmpeg on PATH; stdlib only.
 """
+
 import argparse
 import json
 import re
@@ -28,26 +29,46 @@ import sys
 from pathlib import Path
 
 SCENE_RECENT = 0.02  # checking a short window for a just-happened change
-LOOKBACK = 2.0       # `at`: a change this close before the time means "take the earlier frame"
+LOOKBACK = 2.0  # `at`: a change this close before the time means "take the earlier frame"
 WIDTH = 1280
 
 
 def ffmpeg(*args):
-    return subprocess.run(["ffmpeg", "-hide_banner", "-nostdin", *args],
-                          capture_output=True, text=True, check=True).stderr
+    return subprocess.run(
+        ["ffmpeg", "-hide_banner", "-nostdin", *args], capture_output=True, text=True, check=True
+    ).stderr
 
 
 def scene_changes(video, threshold, start=None, length=None):
     """Times (s, absolute) where the scene score exceeds threshold."""
     seek = ["-ss", f"{start:.3f}", "-t", f"{length:.3f}", "-copyts"] if start is not None else []
-    log = ffmpeg(*seek, "-i", str(video), "-an",
-                 "-vf", f"scale=640:-2,select='gt(scene,{threshold})',showinfo", "-f", "null", "-")
+    log = ffmpeg(
+        *seek,
+        "-i",
+        str(video),
+        "-an",
+        "-vf",
+        f"scale=640:-2,select='gt(scene,{threshold})',showinfo",
+        "-f",
+        "null",
+        "-",
+    )
     return [float(x) for x in re.findall(r"pts_time:([\d.]+)", log)]
 
 
 def grab(video, t, out):
-    ffmpeg("-y", "-ss", f"{max(t, 0):.3f}", "-i", str(video), "-frames:v", "1",
-           "-vf", f"scale={WIDTH}:-2", str(out))
+    ffmpeg(
+        "-y",
+        "-ss",
+        f"{max(t, 0):.3f}",
+        "-i",
+        str(video),
+        "-frames:v",
+        "1",
+        "-vf",
+        f"scale={WIDTH}:-2",
+        str(out),
+    )
 
 
 def stable_time(video, t):

@@ -121,6 +121,12 @@ def test_the_prompt_carries_the_files_the_agent_needs(wd):
     assert "## `context/team.json`" in text and "Gina Lorenz" in text
     assert "## `frames/commands.json`\n\n(none: no screenshot requests)" in text
     assert "Don't read those files again" in text
+    # The rules are the workflow's own, and the agent's frames.py is the bundled one.
+    assert "## `summary-rules.md`" in text and "## `chat-commands.md`" in text
+    assert "A name said near a line doesn't tell you who said it." in text
+    frames_py = Config.from_env({}).scripts_dir / "frames.py"
+    assert f"python3 {frames_py} at" in text and frames_py.exists()
+    assert "outline MCP" not in text and "$" + "scripts" not in text
 
 
 def test_off_record_spans_are_cut_from_the_transcript(wd):

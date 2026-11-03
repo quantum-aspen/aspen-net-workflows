@@ -8,7 +8,6 @@ env_passthrough:
   - OUTLINE_API_KEY
   - MEETINGS_COLLECTION_ID
   - DATA_DIR
-  - SKILL_DIR
   - WHISPER_MODEL
   - RUN_HOURS
   - AGENT

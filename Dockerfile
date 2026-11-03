@@ -1,11 +1,10 @@
-# One container: Dagu (server + scheduler), the step commands, the skill's scripts and
-# toolchain, and Hermes for the agent step. Built on the Hermes image, as
+# One container: Dagu (server + scheduler), the step commands and the meeting scripts with
+# their toolchain, and Hermes for the agent step. Built on the Hermes image, as
 # aspen-net-transcriber is, so its s6 init still drops to the hermes user and reaps orphans.
 ARG HERMES_IMAGE=nousresearch/hermes-agent:latest
 FROM ${HERMES_IMAGE}
 
 ARG DAGU_VERSION=2.24.0
-ARG SKILLS_REF=main
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg jq curl ca-certificates \
@@ -20,7 +19,6 @@ COPY src ./src
 RUN uv sync --frozen --no-dev --extra media
 ENV PATH=/opt/workflows/.venv/bin:$PATH VIRTUAL_ENV=/opt/workflows/.venv
 
-ADD https://github.com/quantum-aspen/aspen-net-skills.git#${SKILLS_REF}:skills /opt/skills
 COPY dags ./dags
 COPY dagu.yaml /opt/dagu/config.yaml
 COPY base.yaml /opt/dagu/base.yaml
@@ -38,7 +36,6 @@ ENV DAGU_HOME=/opt/dagu \
     DAGU_EVENT_STORE_DIR=/opt/data/dagu/logs/admin/events \
     DAGU_WIKI_DIR=/opt/data/dagu/wiki \
     DATA_DIR=/opt/data \
-    SKILL_DIR=/opt/skills/local-meeting-transcript \
     DAGU_COORDINATOR_ENABLED=false
 
 # Hermes' config (Lumen, no MCP servers) is written by the summarise step, from the env.
