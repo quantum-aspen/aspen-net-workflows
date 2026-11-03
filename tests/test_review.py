@@ -233,3 +233,12 @@ def test_the_glossary_is_terms_and_whisper_gets_it_as_a_sentence():
 
     assert "HOM dip" in glossary() and not any(t.startswith("#") for t in glossary())
     assert Config.from_env({}).asr_prompt.startswith("An ASPEN-NET meeting about quantum networking: ")
+
+
+def test_only_number_and_unit_flags_are_rechecked():
+    assert review.rechecks({"kind": "number", "heard": "45"})
+    assert review.rechecks({"kind": "unit", "heard": "10 seconds"})
+    assert review.rechecks({"heard": "a 45 femtosecond lock"})  # no kind, but a number
+    assert not review.rechecks({"kind": "term", "heard": "beamsuit"})
+    assert not review.rechecks({"kind": "unit", "heard": "600 femtoseconds", "likely": "600 fs"})
+    assert review.rechecks({"kind": "unit", "heard": "10 seconds", "likely": "10 femtoseconds"})

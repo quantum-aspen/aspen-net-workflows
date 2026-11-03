@@ -147,8 +147,9 @@ ls .data/work/<page id>/would-write/
   wrote "45-femtosecond lock" for 40 and "10 seconds" for femtoseconds, and Lumen ignores
   a vocabulary prompt. `review` re-checks the suspect chunks with whisper: flagged by a
   model's read-through, near misses of glossary terms, and numbers that differ from
-  Zoom's own transcript when there is one. That run fixed all of them in about 5 min,
-  against 7.3 min for whisper on everything (4 CPU cores). Timestamps are per chunk.
+  Zoom's own transcript when there is one. Of the model's flags only numbers and units
+  are re-checked. On the test meeting that's 24% of it, and it fixed all of them in about
+  3 min, against 7.3 min for whisper on everything (4 CPU cores). Timestamps are per chunk.
 - **`fetch` isn't tested against Zoom** here. It's the skill's unchanged `fetch.sh`.
 - **The real wiki is untested.** The prototype checked its Outline calls against a mock.
   A dry run covers the reads (`templates.list` and `collections.documents` are the ones to

@@ -4,9 +4,10 @@ Lumen's speech model is fast but mishears technical terms, units and numbers, an
 be given a vocabulary. So after it, this step finds the chunks that look wrong and has
 faster-whisper, which can take a vocabulary prompt, transcribe just those again:
 
-- One call to a Lumen chat model flags lines that look misheard: a non sequitur, a garbled
-  term, an implausible unit. Its guesses at the right words are often wrong, so they're
-  only used to pick what to re-check, never as corrections.
+- One call to a Lumen chat model flags lines that look misheard. Only its number and unit
+  flags are re-checked: those read plausibly, so nothing else catches them. Its guesses at
+  the right words are often wrong, so they're never used as corrections. Every flag is
+  recorded in review.json.
 - Words that are a near miss of a term in prompts/glossary.txt ("modlock" for
   mode-locked) are flagged: the model's read-through varies from run to run, this doesn't.
 - If Zoom made its own transcript (play_info.json's `transcriptList`), it's compared with
@@ -68,7 +69,12 @@ are likely wrong: not missing units or punctuation, odd grammar, or ordinary dis
 
 Answer with JSON only:
 {"suspects": [{"at": "H:MM:SS", "heard": "<the suspicious words, exactly as written>", \
+"kind": "number" | "unit" | "term", "likely": "<what was probably said>", \
 "why": "<a few words>"}]}
+
+`kind` is "number" when a number looks wrong, "unit" when a unit does (seconds where \
+femtoseconds make sense), and "term" for any other misheard word or name. Don't flag a \
+number or unit that's plausible as written.
 
 Transcript:
 $transcript"""
@@ -221,6 +227,18 @@ def parse_suspects(answer: str) -> list[dict]:
     ]
 
 
+def rechecks(suspect: dict) -> bool:
+    """Whether a flagged line is worth a re-check: a number or a unit. Those read plausibly
+    but change the meaning, and only the model can see them. Misheard terms are mostly what
+    the glossary's near misses catch, and the rest ("beamsuit") the summary's known-errors
+    table can fix; re-checking them all doubled the review's time. A flag whose `likely` is
+    what was heard isn't a suspicion: asked about numbers, the model flags plausible ones."""
+    heard, likely = str(suspect.get("heard", "")), str(suspect.get("likely", ""))
+    if likely and tokens(likely) == tokens(heard):  # "600 femtoseconds", likely "600 fs"
+        return False
+    return suspect.get("kind") in ("number", "unit") or any(c.isdigit() for c in heard)
+
+
 def chunk_for(suspect: dict, spans: list[tuple[float, float]], texts: list[str]) -> int:
     """The chunk a flagged line is in: by its time, or a neighbour if the words are there."""
     t = _secs(suspect["at"])
@@ -294,10 +312,11 @@ def review(cfg: Config, wd: Path) -> None:
         t0 = time.time()
         suspects = parse_suspects(_chat(cfg, prompt))
         print(f"{cfg.review_model} flagged {len(suspects)} lines in {time.time() - t0:.0f}s", flush=True)
-        for s in suspects:
+        for s in filter(rechecks, suspects):
             why.setdefault(chunk_for(s, spans, texts), []).append(
                 f"{s.get('heard', '')!r}: {s.get('why', '')}"
             )
+        print(f"{sum(map(rechecks, suspects))} of them are numbers or units", flush=True)
     else:
         print("no REVIEW_MODEL: skipping the model's read-through")
 
