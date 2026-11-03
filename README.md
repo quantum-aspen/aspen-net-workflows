@@ -41,8 +41,9 @@ the wiki by hand.
 ```
 meeting-poll ──enqueue──▶ meeting(DOC_ID)
 
-window ─▶ fetch ─▶ transcribe ─▶ frames ─┐
-             └──▶ context ───────────────┴─▶ summarise ─▶ publish
+window ─▶ fetch ─▶ transcribe ─▶ review ─▶ frames ─┐
+             └──▶ context ───────────┘                ├─▶ summarise ─▶ publish
+                             └────────────────────────┘
 on failure: fail (reason + retry box on the page)    on exit: clean (delete media)
 ```
 
@@ -83,6 +84,7 @@ src/aspen_steps/ one command per step: aspen-steps <step> [doc id]
   meeting.py     poll, claim, context, summarise, publish, status
   media.py       fetch, transcribe, frames (the local-meeting-transcript skill's scripts)
   asr.py         transcription on Lumen's speech model, in timed chunks
+  review.py      re-checks a Lumen transcript's misheard-looking chunks with whisper
   agent.py       unattended agent runs, hermes or claude
   check.py       the agent's output shape and the checks it must pass
   outline.py     the wiki API, and the dry run: writes recorded, not made
@@ -127,6 +129,10 @@ ls .data/work/<page id>/would-write/
 | `LUMEN_ASR_MODEL` | | e.g. `granite-speech-4.1-2b-plus` |
 | `LUMEN_VISION_MODEL` | | e.g. `gemma-4-31b-it`; without it the agent has no vision tool |
 | `ASR_CHUNK_SECONDS`, `ASR_CONCURRENCY` | 30, 4 | chunk length (cut in pauses) and requests at once |
+| `REVIEW` | `auto` | with `TRANSCRIBER=lumen`, re-check misheard-looking chunks with whisper (`review.py`); `0` turns it off |
+| `REVIEW_MODEL` | hermes' `AGENT_MODEL` | the Lumen model that reads the transcript for misheard lines |
+| `REVIEW_MAX_SHARE` | 0.5 | most of the meeting the re-check may cover |
+| `TRANSCRIBE_PROMPT` | from `prompts/glossary.txt` | whisper's vocabulary; edit the glossary to add terms |
 | `RUN_HOURS` | any time | e.g. `20-6`, container clock (`TZ`) |
 | `AGENT`, `AGENT_MODEL` | `hermes` | for hermes, the Lumen model id (e.g. `deepseek-v4.1-flash`); `claude` for dev |
 | `AGENT_MAX_TURNS`, `AGENT_BUDGET_SECONDS` | 90, 2700 | |
@@ -137,8 +143,12 @@ ls .data/work/<page id>/would-write/
 
 - **Hermes on Lumen is untested.** `summarise` writes Hermes' config (Lumen for the model
   and vision, no MCP servers) and Hermes reads it, but no run has gone through Lumen yet.
-- **Lumen transcription is untested on real audio.** `TRANSCRIBER=lumen` has only run
-  against a stand-in server. Its timestamps are per chunk, spread over sentences.
+- **Lumen transcription mishears terms and numbers.** On a 38-minute talk granite-speech
+  wrote "45-femtosecond lock" for 40 and "10 seconds" for femtoseconds, and Lumen ignores
+  a vocabulary prompt. `review` re-checks the suspect chunks with whisper: flagged by a
+  model's read-through, near misses of glossary terms, and numbers that differ from
+  Zoom's own transcript when there is one. That run fixed all of them in about 5 min,
+  against 7.3 min for whisper on everything (4 CPU cores). Timestamps are per chunk.
 - **`fetch` isn't tested against Zoom** here. It's the skill's unchanged `fetch.sh`.
 - **The real wiki is untested.** The prototype checked its Outline calls against a mock.
   A dry run covers the reads (`templates.list` and `collections.documents` are the ones to
