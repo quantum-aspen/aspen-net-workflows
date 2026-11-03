@@ -1,8 +1,9 @@
-"""Runs an agent unattended in a work directory, with no wiki access.
+"""Runs an agent unattended in a work directory, with no wiki tools.
 
 The agent reads files and writes files. Steps before it put everything it needs in
 the work directory, and steps after it check and publish what it wrote, so it never
-holds the Outline key: it's taken out of the agent's environment here.
+needs the Outline key. It's taken out of the agent's environment here, but that alone
+doesn't keep it from the agent: see "Not done yet" in the README.
 
 AGENT picks the harness: `hermes` (production, on Lumen) or `claude` (Claude Code on
 whatever account the machine is logged into, for development). For hermes, AGENT_MODEL is
@@ -103,7 +104,7 @@ def _hermes(cfg: Config, prompt: str, wd: Path, read_dirs: list[Path], commands:
         "hermes", "chat",
         "--query-file", str(wd / "prompt.md"),
         "--quiet",
-        # terminal is for the frames.py command; the container holds no wiki credentials
+        # terminal is for the frames.py command
         "--toolsets", toolsets,
         "--max-turns", str(cfg.agent_max_turns),
         "--run-budget", str(cfg.agent_budget),

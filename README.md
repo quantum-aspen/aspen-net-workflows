@@ -57,8 +57,9 @@ whose output already exists, so retries and re-ticks are cheap.
 **Only `summarise` has a model in it.** The agent works on files: `context` writes what it
 would otherwise read from the wiki (the series page, the latest summaries in the series, the
 template, the roster) into the work dir. The agent writes `out/summary.md` and
-`out/result.json`. It has no wiki access, and `OUTLINE_API_KEY` is removed from its
-environment. `summarise` checks what it wrote (`check.py`):
+`out/result.json`. It has no wiki tools, and `OUTLINE_API_KEY` is removed from the
+environment it's started with, but that doesn't yet keep the key from it (see *Not done
+yet*). `summarise` checks what it wrote (`check.py`):
 
 - the recording date
 - no H1 and no template placeholders
@@ -142,6 +143,14 @@ ls .data/would-write/<page id>/
 | `DRY_RUN` | off | read the wiki, record writes in `would-write/` |
 
 ## Not done yet
+
+- **The agent can still reach the Outline key.** It runs as the same `hermes` user as Dagu
+  and the steps, so its terminal tool can read the key from Dagu's `/proc/<pid>/environ`
+  or from `/run/s6/container_environment/OUTLINE_API_KEY` (world-readable). Hermes 0.22 also
+  runs every `hermes chat` turn in its gateway, which s6 starts with the whole container
+  env, and Hermes' terminal tool doesn't strip non-provider keys. The fix: Dagu and the
+  steps on their own user, the key in a file only that user reads, and the agent started
+  as `hermes` through a narrow sudo rule.
 
 - **Hermes on Lumen is untested.** `summarise` writes Hermes' config (Lumen for the model
   and vision, no MCP servers) and Hermes reads it, but no run has gone through Lumen yet.
