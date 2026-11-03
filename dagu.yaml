@@ -10,6 +10,7 @@ env_passthrough:
   - DATA_DIR
   - WHISPER_MODEL
   - RUN_HOURS
+  - TZ  # RUN_HOURS is read on the container clock
   - AGENT
   - AGENT_MODEL
   - AGENT_MAX_TURNS
