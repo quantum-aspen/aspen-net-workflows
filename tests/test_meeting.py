@@ -98,6 +98,31 @@ def test_agent_gets_its_check_failures_back_once(wd, monkeypatch):
     assert "isn't the recording date 2026-10-27" in prompts[1]
 
 
+def test_an_agent_that_wrote_nothing_gets_the_original_prompt_again(wd, monkeypatch):
+    shutil.rmtree(wd / "out")
+    prompts = []
+
+    def crash_then_write(cfg, prompt, wd, **_):
+        prompts.append(prompt)
+        if len(prompts) == 2:
+            _agent_output(wd)
+        return 1 if len(prompts) == 1 else 0
+
+    monkeypatch.setattr(meeting.agent, "run", crash_then_write)
+    meeting.summarise(Config.from_env({}), wd)
+    assert len(prompts) == 2 and prompts[1] == prompts[0]
+
+
+def test_the_prompt_carries_the_files_the_agent_needs(wd):
+    (wd / "transcript.txt").write_text("[0:00:39] Here's the ZeroMQ proposal.\n")
+    (wd / "chat.md").write_text("0:00:39 Gina Lorenz: ai: screenshot the ZeroMQ proposal\n")
+    text = meeting._prompt(Config.from_env({}), wd) + meeting._materials(Config.from_env({}), wd)
+    assert "## `transcript.txt`" in text and "Here's the ZeroMQ proposal." in text
+    assert "## `context/team.json`" in text and "Gina Lorenz" in text
+    assert "## `frames/commands.json`\n\n(none: no screenshot requests)" in text
+    assert "Don't read those files again" in text
+
+
 def test_off_record_spans_are_cut_from_the_transcript(wd):
     srt = meeting._srt_without((wd / "transcript.srt").read_text(), [(55, 62)])
     assert "coffee" not in srt

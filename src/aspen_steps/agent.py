@@ -54,6 +54,8 @@ def hermes_settings(cfg: Config) -> dict:
         # Each run is independent: nothing should carry over between meetings.
         "memory": {"memory_enabled": False, "user_profile_enabled": False},
         "auxiliary": {"title_generation": {"enabled": False}},
+        # Lumen answers "Upstream error" now and then; the default of 3 retries ended a run.
+        "agent": {"api_max_retries": 6},
     }
     if cfg.lumen_vision_model:
         s["auxiliary"]["vision"] = lumen | {"model": cfg.lumen_vision_model}

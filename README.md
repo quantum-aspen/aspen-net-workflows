@@ -97,7 +97,7 @@ tests/           pytest on the steps' own logic, with a checked-in work dir
 
 There's no stand-in wiki. The steps run against the real one in a **dry run**: they read
 it as usual, but each write (a page update, an upload) is recorded in the job's
-`would-write/` instead, as the new page text and a diff against what's there now. Any
+`would-write/<page id>/` in the data dir instead, as the new page text and a diff against what's there now. Any
 recording page with a Zoom link works, even one that's already been summarised, and
 nothing on the wiki changes. Your own Outline API key (the one the Outline MCP uses) is
 fine for this.
@@ -108,7 +108,7 @@ just test                # pytest, ruff
 cp .env.example .env     # your Outline key, the Meetings collection id, Lumen
 just up                  # build and start the image; Dagu UI on http://127.0.0.1:18080
 just try <page id>       # claim the page and run the meeting workflow on it
-ls .data/work/<page id>/would-write/
+ls .data/would-write/<page id>/
 ```
 
 `just up` runs only Dagu's UI server, not its scheduler, so `meeting-poll` doesn't fire.

@@ -22,11 +22,12 @@ EARLIER = 3  # summaries from the same series the agent reads for cross-referenc
 
 
 def outline(cfg: Config, wd: Path | None = None) -> Outline:
-    """A dry run records the writes it would make in the job's would-write/ (or the data
+    """A dry run records the writes it would make in would-write/<doc id>/ (or the data
     dir's, for writes that aren't a job's)."""
     if not cfg.outline_api_key.get_secret_value():
         raise StepError("OUTLINE_API_KEY isn't set")
-    would_write = (wd or cfg.data_dir) / "would-write" if cfg.dry_run else None
+    # Outside the work dir, which the agent works in: it has no business reading it.
+    would_write = cfg.data_dir / "would-write" / (wd.name if wd else "") if cfg.dry_run else None
     return Outline(cfg.outline_url, cfg.outline_api_key, would_write=would_write)
 
 
@@ -195,11 +196,39 @@ def _prompt(cfg: Config, wd: Path) -> str:
     )
 
 
+def _materials(cfg: Config, wd: Path) -> str:
+    """The files the agent needs, inlined after the instructions, so it spends no turns
+    reading them. Each turn on Lumen takes 15-100 s, and the first run spent a dozen on this."""
+    refs = cfg.skill_dir / "references"
+    files_ = [
+        (refs / "aspen-net-output.md", "aspen-net-output.md"),
+        (refs / "chat-commands.md", "chat-commands.md"),
+        (wd / "context" / "template.md", "context/template.md"),
+        (wd / "context" / "series.md", "context/series.md"),
+        (wd / "context" / "team.json", "context/team.json"),
+        *((f, f"context/earlier/{f.name}") for f in sorted((wd / "context" / "earlier").glob("*.md"))),
+        (wd / "recording_datetime.txt", "recording_datetime.txt"),
+        (wd / "chat.md", "chat.md"),
+        (wd / "frames" / "commands.json", "frames/commands.json"),
+        (wd / "transcript.txt", "transcript.txt"),
+    ]
+    parts = ["# The files"]
+    for path, name in files_:
+        if path.exists():
+            parts.append(f"## `{name}`\n\n````\n{path.read_text().strip()}\n````")
+        elif name in ("chat.md", "frames/commands.json"):
+            parts.append(
+                f"## `{name}`\n\n(none: {'no chat' if name == 'chat.md' else 'no screenshot requests'})"
+            )
+    return "\n\n".join(parts) + "\n"
+
+
 def summarise(cfg: Config, wd: Path, attempts: int = 2) -> None:
     """Runs the agent, then checks what it wrote. Problems go back to it once."""
     (wd / "out").mkdir(exist_ok=True)
     (wd / "out" / "result.json").unlink(missing_ok=True)
-    prompt = _prompt(cfg, wd)
+    original = _prompt(cfg, wd) + "\n\n" + _materials(cfg, wd)
+    prompt = original
     frames_at = f"python3 {cfg.skill_dir}/scripts/frames.py at"
     for attempt in range(1, attempts + 1):
         rc = agent.run(cfg, prompt, wd, read_dirs=[cfg.skill_dir], commands=[frames_at])
@@ -214,12 +243,16 @@ def summarise(cfg: Config, wd: Path, attempts: int = 2) -> None:
             print(f"summary passed its checks on attempt {attempt}")
             return
         print(f"attempt {attempt} (agent exit {rc}) failed its checks:", *found, sep="\n- ", flush=True)
+        if not any((wd / "out" / f).exists() for f in ("summary.md", "result.json")):
+            # The agent stopped before writing anything (a provider error, say): start again.
+            prompt = original
+            continue
         prompt = (
             "You already wrote out/summary.md and out/result.json for this meeting, but they failed "
             "these checks. Fix them, changing nothing else, and stop.\n\n"
             + "\n".join(f"- {p}" for p in found)
             + "\n\nThe original instructions follow.\n\n"
-            + _prompt(cfg, wd)
+            + original
         )
     raise StepError(f"the summary failed its checks: {'; '.join(found)}")
 

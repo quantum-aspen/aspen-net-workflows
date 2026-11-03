@@ -49,7 +49,7 @@ def test_hermes_config_points_at_lumen_and_drops_mcp(tmp_path):
         "key_env": "LUMEN_API_KEY", "default": "m",
     }  # fmt: skip
     assert data["auxiliary"]["vision"]["model"] == "v"
-    assert data["agent"] == {"x": 1}
+    assert data["agent"] == {"x": 1, "api_max_retries": 6}
     assert "mcp_servers" not in data
     assert "lu-secret" not in text
 

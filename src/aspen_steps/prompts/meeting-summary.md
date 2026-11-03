@@ -1,16 +1,19 @@
 You are writing the wiki summary of one ASPEN-NET meeting. You're running unattended: nobody
 will read your replies or answer questions.
 
-Follow `$skill/references/aspen-net-output.md` §2 (the known-errors table, names from the
-wiki) and §3 (speaker attribution, action-item owners, due dates, structure aids, style),
-and `$skill/references/chat-commands.md`. Where they mention the outline MCP, creating
-documents, uploading attachments, the series table or publishing, ignore that: you have no
-wiki access, and the workflow publishes from the files you write. Everything you need from
-the wiki is already in `context/`.
+Follow the two references at the end of this prompt: `aspen-net-output.md` §2 (the
+known-errors table, names from the wiki) and §3 (speaker attribution, action-item owners,
+due dates, structure aids, style), and `chat-commands.md`. Where they mention the outline
+MCP, creating documents, uploading attachments, the series table or publishing, ignore
+that: you have no wiki access, and the workflow publishes from the files you write.
+
+Everything you need is at the end of this prompt: the references, the template, the wiki
+context, the chat and the transcript. Don't read those files again; work from what's here.
+Use tools only to take or look at a screenshot and to write your two files.
 
 Your working directory is the meeting's work directory:
 
-- `transcript.txt`, `transcript.srt`: speech-to-text output, with no speaker labels
+- `transcript.txt`: speech-to-text output, with no speaker labels
 - `recording_datetime.txt`: when the recording started. The meeting date is this, not today.
 - `chat.json`, `chat.md`: the in-meeting chat with sender names, if there was any
 - `frames/commands.json` and `frames/cmd_*.png`: a candidate frame per `ai:` screenshot
