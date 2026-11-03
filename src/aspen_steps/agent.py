@@ -54,8 +54,15 @@ def hermes_settings(cfg: Config) -> dict:
         # Each run is independent: nothing should carry over between meetings.
         "memory": {"memory_enabled": False, "user_profile_enabled": False},
         "auxiliary": {"title_generation": {"enabled": False}},
-        # Lumen answers "Upstream error" now and then; the default of 3 retries ended a run.
-        "agent": {"api_max_retries": 6},
+        "agent": {
+            # Lumen answers "Upstream error" now and then; the default of 3 retries ended a run.
+            "api_max_retries": 6,
+            # Any effort level, even "low", turns DeepSeek's thinking on, and Hermes defaults to
+            # medium: 9,500 tokens of reasoning in one turn, about 9 min at Lumen's ~17 tok/s,
+            # and Lumen cut off the next such turn at 11 min. Everything the agent needs is in
+            # its prompt, so it doesn't need to think at length.
+            "reasoning_effort": "none",
+        },
     }
     if cfg.lumen_vision_model:
         s["auxiliary"]["vision"] = lumen | {"model": cfg.lumen_vision_model}
