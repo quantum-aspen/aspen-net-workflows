@@ -155,7 +155,10 @@ def context(cfg: Config, wd: Path) -> None:
     )
     if template is None:
         raise NeedsPerson("the Meetings collection has no 'Meeting summary' template")
-    (ctx / "template.md").write_text(template["text"])
+    # templates.list gives ProseMirror JSON (`data`), not markdown; documents.info on the
+    # template's id gives its `text`.
+    text = template.get("text") or ol.document(template["id"])["text"]
+    (ctx / "template.md").write_text(text)
     print(f"context: {len(team)} users, series {s['title']!r}, {len(earlier)} earlier summaries")
 
 
@@ -183,6 +186,7 @@ def _prompt(cfg: Config, wd: Path) -> str:
     text = files("aspen_steps").joinpath("prompts/meeting-summary.md").read_text()
     return Template(text).substitute(
         skill=cfg.skill_dir,
+        wd=wd.resolve(),
         series=job["series"],
         url=job["url"],
         mentions=mentions,
@@ -241,6 +245,13 @@ def _srt_without(srt: str, spans: list[tuple[float, float]]) -> str:
     return "\n\n".join(kept) + "\n\n"
 
 
+def _transcribed_by(cfg: Config) -> str:
+    if cfg.transcriber == "lumen":
+        chunk = f"{cfg.asr_chunk_seconds:g}"
+        return f"{cfg.lumen_asr_model} on NCSA Lumen, timestamps approximate (~{chunk}s chunks)"
+    return f"faster-whisper {cfg.whisper_model}, run locally"
+
+
 def _transcript_folder(cfg: Config, wd: Path, result: check.Result, title: str, wiki_url: str) -> Path:
     """The local transcript folder, per aspen-net-output §2."""
     out = cfg.meetings_dir / title.replace("/", "-")
@@ -261,7 +272,7 @@ def _transcript_folder(cfg: Config, wd: Path, result: check.Result, title: str, 
     (out / "transcript.md").write_text(
         f"---\ndate: {result.date}\ntitle: {result.title}\n"
         "source: Zoom cloud recording\n"
-        f"transcription: faster-whisper {cfg.whisper_model}, run locally; no speaker labels\n"
+        f"transcription: {_transcribed_by(cfg)}; no speaker labels\n"
         f"attendees: {json.dumps(result.attendees)}\nsummary: {wiki_url}\n---\n\n"
         f"# {title} — transcript\n\n## Known transcription errors\n\n"
         f"| Transcript says | Means |\n|---|---|\n{errors}\n\n---\n\n{clean.read_text()}"

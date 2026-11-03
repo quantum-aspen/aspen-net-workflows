@@ -41,5 +41,5 @@ ENV DAGU_HOME=/opt/dagu \
     SKILL_DIR=/opt/skills/local-meeting-transcript \
     DAGU_COORDINATOR_ENABLED=false
 
-# TODO: write Hermes' config (Lumen, no MCP servers).
+# Hermes' config (Lumen, no MCP servers) is written by the summarise step, from the env.
 CMD ["dagu", "start-all", "--host", "0.0.0.0", "--port", "8080"]

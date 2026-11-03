@@ -5,12 +5,15 @@ the work directory, and steps after it check and publish what it wrote, so it ne
 holds the Outline key: it's taken out of the agent's environment here.
 
 AGENT picks the harness: `hermes` (production, on Lumen) or `claude` (Claude Code on
-whatever account the machine is logged into, for development)."""
+whatever account the machine is logged into, for development). For hermes, AGENT_MODEL is
+the Lumen model id, and LUMEN_VISION_MODEL the one that looks at screenshots."""
 
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+import yaml
 
 from .config import Config
 from .errors import StepError
@@ -42,14 +45,57 @@ def _claude(cfg: Config, prompt: str, wd: Path, read_dirs: list[Path], commands:
     return cmd
 
 
+def hermes_settings(cfg: Config) -> dict:
+    """What we set in Hermes' config.yaml: Lumen for the model and for vision, and nothing
+    that carries over between meetings."""
+    lumen = {"provider": "custom", "base_url": cfg.lumen_base_url, "key_env": "LUMEN_API_KEY"}
+    s = {
+        "model": lumen | {"default": cfg.agent_model},
+        # Each run is independent: nothing should carry over between meetings.
+        "memory": {"memory_enabled": False, "user_profile_enabled": False},
+        "auxiliary": {"title_generation": {"enabled": False}},
+    }
+    if cfg.lumen_vision_model:
+        s["auxiliary"]["vision"] = lumen | {"model": cfg.lumen_vision_model}
+    return s
+
+
+def _merge(base: dict, over: dict) -> dict:
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = _merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def write_hermes_config(cfg: Config, home: Path | None = None) -> Path:
+    """Merges our settings into $HERMES_HOME/config.yaml before each run, so the config
+    always matches this image and env. The key stays in the env (key_env), not the file.
+    MCP servers are dropped: the agent has no wiki access, and nothing else to reach."""
+    if cfg.agent_model == "":
+        raise StepError("AGENT=hermes needs AGENT_MODEL, the Lumen model id (e.g. deepseek-v4.1-flash)")
+    if not cfg.lumen_api_key.get_secret_value():
+        raise StepError("AGENT=hermes needs LUMEN_API_KEY")
+    home = home or Path(os.environ.get("HERMES_HOME", "/opt/data"))
+    path = home / "config.yaml"
+    current = (yaml.safe_load(path.read_text()) if path.exists() else None) or {}
+    merged = _merge(current, hermes_settings(cfg))
+    merged.pop("mcp_servers", None)
+    home.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(merged, sort_keys=False))
+    return path
+
+
 def _hermes(cfg: Config, prompt: str, wd: Path, read_dirs: list[Path], commands: list[str]) -> list[str]:
+    print(f"hermes config: {write_hermes_config(cfg)} (Lumen, {cfg.agent_model})", flush=True)
     (wd / "prompt.md").write_text(prompt)
+    # vision without a vision model would fall back to the main model, which can't see
+    toolsets = "terminal,file,vision,todo" if cfg.lumen_vision_model else "terminal,file,todo"
     return [
         "hermes", "chat",
         "--query-file", str(wd / "prompt.md"),
         "--quiet",
         # terminal is for the frames.py command; the container holds no wiki credentials
-        "--toolsets", "terminal,file,vision,todo",
+        "--toolsets", toolsets,
         "--max-turns", str(cfg.agent_max_turns),
         "--run-budget", str(cfg.agent_budget),
         "--yolo",  # no one is there to approve tool calls

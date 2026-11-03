@@ -35,6 +35,16 @@ class Config:
     data_dir: Path
     skill_dir: Path
     whisper_model: str
+    # "whisper" runs the skill's transcribe.py locally; "lumen" sends the audio to
+    # Lumen's speech model (asr.py).
+    transcriber: str
+    lumen_base_url: str
+    lumen_api_key: SecretStr
+    lumen_asr_model: str
+    lumen_vision_model: str
+    asr_chunk_seconds: float
+    asr_concurrency: int
+    asr_prompt: str
     run_hours: tuple[int, int] | None
     agent: str
     agent_model: str
@@ -67,6 +77,14 @@ class Config:
             data_dir=Path(e.get("DATA_DIR", "/opt/data")),
             skill_dir=Path(e.get("SKILL_DIR", "/opt/skills/local-meeting-transcript")),
             whisper_model=e.get("WHISPER_MODEL", "large-v3-turbo"),
+            transcriber=e.get("TRANSCRIBER", "whisper"),
+            lumen_base_url=e.get("LUMEN_BASE_URL", "https://lumen.ncsa.illinois.edu/v1").rstrip("/"),
+            lumen_api_key=SecretStr(e.get("LUMEN_API_KEY", "")),
+            lumen_asr_model=e.get("LUMEN_ASR_MODEL", ""),
+            lumen_vision_model=e.get("LUMEN_VISION_MODEL", ""),
+            asr_chunk_seconds=float(e.get("ASR_CHUNK_SECONDS", "30")),
+            asr_concurrency=int(e.get("ASR_CONCURRENCY", "4")),
+            asr_prompt=e.get("TRANSCRIBE_PROMPT", ""),
             run_hours=_hours(e.get("RUN_HOURS", "")),
             agent=e.get("AGENT", "hermes"),
             agent_model=e.get("AGENT_MODEL", ""),

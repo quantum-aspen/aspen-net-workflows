@@ -10,14 +10,13 @@ the wiki is already in `context/`.
 
 Your working directory is the meeting's work directory:
 
-- `transcript.txt`, `transcript.srt`: whisper output, with no speaker labels
+- `transcript.txt`, `transcript.srt`: speech-to-text output, with no speaker labels
 - `recording_datetime.txt`: when the recording started. The meeting date is this, not today.
 - `chat.json`, `chat.md`: the in-meeting chat with sender names, if there was any
-- `frames/commands.json` and `frames/cmd_*.png`: a candidate frame per `ai:` command
-- `frames/scenes.json` and `frames/scene_*.png`: frames where the shared screen changed
+- `frames/commands.json` and `frames/cmd_*.png`: a candidate frame per `ai:` screenshot
+  request in the chat, if there were any
 - `meeting.mp4` (and `share.mp4` if it exists): for
-  `python3 $skill/scripts/frames.py at <video> <seconds> frames/<name>.png`, when a command
-  asks for an earlier moment
+  `python3 $skill/scripts/frames.py at <video> <seconds> frames/<name>.png`
 - `context/series.md`: the series page this meeting belongs to, "$series"
 - `context/earlier/`: the latest summaries in that series. Read them, so cross-references
   are real.
@@ -26,14 +25,26 @@ Your working directory is the meeting's work directory:
 - `context/team.json`: the wiki's users, `[{name, id}]`. Resolve and spell team members'
   names from it.
 
+Screenshots: this replaces what the references say about scene frames; there are none.
+
+- Every screenshot someone asked for with an `ai:` command goes in (`frames/commands.json`;
+  for "earlier" or "the slide before", take it with `frames.py at` a little before).
+- Beyond those, add one only when the transcript makes it obvious the summary needs it:
+  the speakers are walking through a diagram, plot or schematic ("as you can see in this
+  figure…") and the summary discusses it. Take it with `frames.py at` at that moment, look
+  at it once to check it shows that and to write the caption, and keep it to a few per
+  meeting. Most meetings need none.
+- Don't step through the recording looking at slides, and don't describe slides you
+  aren't using. When you look at an image, give its absolute path, under $wd.
+
 Write exactly two files, then stop.
 
 1. `out/summary.md`: the page body, filled in from the template.
    - No H1: the title is a separate field.
    - The header's Recording row links $url
    - $mentions
-   - Place each screenshot you keep as `![caption](frames/<file>.png)` at the topic it
-     belongs to. The workflow uploads it. Reference only frames that exist.
+   - Place each screenshot as `![caption](frames/<file>.png)` at the topic it belongs to.
+     The workflow uploads it. Reference only frames that exist.
 
 2. `out/result.json`:
 

@@ -16,11 +16,13 @@ env_passthrough:
   - AGENT_MAX_TURNS
   - AGENT_BUDGET_SECONDS
   - MENTIONS
-  - LUMEN_BASE_URL
-  - LUMEN_API_KEY
+  - TRANSCRIBER
+  - ASR_CHUNK_SECONDS
+  - ASR_CONCURRENCY
   - HERMES_HOME
   - HF_HOME
   - VIRTUAL_ENV
 env_passthrough_prefixes:
   - TRANSCRIBE_  # transcribe.py's remote-whisper settings
+  - LUMEN_       # base url, key, and the agent's, vision and speech models
   - DAGU_        # so poll's `dagu enqueue` finds the same home and DAGs

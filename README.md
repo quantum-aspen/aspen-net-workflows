@@ -13,7 +13,8 @@ series:
 1. In the Meetings collection, open the series (e.g. *Software stack meeting*) and add a
    child page from the **Meeting recording** template.
 2. Paste the Zoom share link. If the recording has a passcode, add a line
-   `passcode: <code>`.
+   `passcode: <code>`. Zoom's own share text (`Link: <title> <url>` then
+   `Passcode: <code>`) works as pasted.
 3. Tick **Ready to transcribe**.
 
 Within 5 minutes the box turns into a status callout: `queued`, then `working: …`. When
@@ -81,6 +82,7 @@ src/aspen_steps/ one command per step: aspen-steps <step> [doc id]
   page.py        the recording-page protocol: link, passcode, tick box, status callout
   meeting.py     poll, claim, context, summarise, publish, status
   media.py       fetch, transcribe, frames (the local-meeting-transcript skill's scripts)
+  asr.py         transcription on Lumen's speech model, in timed chunks
   agent.py       unattended agent runs, hermes or claude
   check.py       the agent's output shape and the checks it must pass
   outline.py     the wiki API, and the dry run: writes recorded, not made
@@ -119,19 +121,24 @@ ls .data/work/<page id>/would-write/
 | `MEETINGS_COLLECTION_ID` | | |
 | `DATA_DIR` | `/opt/data` | `work/<doc id>/`, `meetings/`, `hf/` |
 | `SKILL_DIR` | `/opt/skills/local-meeting-transcript` | |
+| `TRANSCRIBER` | `whisper` | `whisper`: the skill's `transcribe.py`, locally. `lumen`: Lumen's speech model, in timed chunks (`asr.py`) |
 | `WHISPER_MODEL` | `large-v3-turbo` | `TRANSCRIBE_*` as in the skill's `transcribe.py` |
+| `LUMEN_BASE_URL`, `LUMEN_API_KEY` | lumen.ncsa.illinois.edu/v1 | for Hermes, and for `TRANSCRIBER=lumen` |
+| `LUMEN_ASR_MODEL` | | e.g. `granite-speech-4.1-2b-plus` |
+| `LUMEN_VISION_MODEL` | | e.g. `gemma-4-31b-it`; without it the agent has no vision tool |
+| `ASR_CHUNK_SECONDS`, `ASR_CONCURRENCY` | 30, 4 | chunk length (cut in pauses) and requests at once |
 | `RUN_HOURS` | any time | e.g. `20-6`, container clock (`TZ`) |
-| `AGENT`, `AGENT_MODEL` | `hermes` | `claude` for dev |
+| `AGENT`, `AGENT_MODEL` | `hermes` | for hermes, the Lumen model id (e.g. `deepseek-v4.1-flash`); `claude` for dev |
 | `AGENT_MAX_TURNS`, `AGENT_BUDGET_SECONDS` | 90, 2700 | |
 | `MENTIONS` | on | @mention attendees and owners |
 | `DRY_RUN` | off | read the wiki, record writes in `would-write/` |
 
 ## Not done yet
 
-- **Hermes config.** The image builds and runs, but doesn't yet write Hermes' config
-  (Lumen as the model provider, no MCP servers).
-- **Hermes isn't tested.** The prototype's end-to-end run used `AGENT=claude`; `just try`
-  uses Hermes, so its first run is the first Hermes test.
+- **Hermes on Lumen is untested.** `summarise` writes Hermes' config (Lumen for the model
+  and vision, no MCP servers) and Hermes reads it, but no run has gone through Lumen yet.
+- **Lumen transcription is untested on real audio.** `TRANSCRIBER=lumen` has only run
+  against a stand-in server. Its timestamps are per chunk, spread over sentences.
 - **`fetch` isn't tested against Zoom** here. It's the skill's unchanged `fetch.sh`.
 - **The real wiki is untested.** The prototype checked its Outline calls against a mock.
   A dry run covers the reads (`templates.list` and `collections.documents` are the ones to

@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from . import asr
 from .config import Config
 from .errors import NeedsPerson, StepError
 
@@ -70,6 +71,10 @@ def transcribe(cfg: Config, wd: Path) -> None:
     if (wd / "transcript.srt").exists():
         print("already transcribed")
         return
+    if cfg.transcriber == "lumen":
+        return asr.transcribe(cfg, wd)
+    if cfg.transcriber != "whisper":
+        raise StepError(f"TRANSCRIBER={cfg.transcriber!r}; expected whisper or lumen")
     env = {"HF_HOME": str(cfg.data_dir / "hf")}
     _run(
         [
@@ -86,14 +91,14 @@ def transcribe(cfg: Config, wd: Path) -> None:
 
 
 def frames(cfg: Config, wd: Path) -> None:
-    """Candidate frames for each `ai:` command and each screen change. The agent picks."""
+    """A candidate frame for each `ai:` command in the chat, and nothing else: screenshots
+    are what people ask for. A frame at every screen change (`frames.py scenes`) would leave
+    the agent dozens of slides to look through. It takes its own with `frames.py at` only
+    when the discussion is plainly about something on screen."""
     script = [sys.executable, str(cfg.skill_dir / "scripts" / "frames.py")]
     video = wd / ("share.mp4" if (wd / "share.mp4").exists() else "meeting.mp4")
-    if video.exists():
-        if (wd / "chat.json").exists() and not (wd / "frames" / "commands.json").exists():
-            _run([*script, "commands", video.name, "chat.json", "frames"], wd)
-        if (wd / "play_info.json").exists() and not (wd / "frames" / "scenes.json").exists():
-            _run([*script, "scenes", video.name, "play_info.json", "frames"], wd)
+    if video.exists() and (wd / "chat.json").exists() and not (wd / "frames" / "commands.json").exists():
+        _run([*script, "commands", video.name, "chat.json", "frames"], wd)
     # whisper is done with it; the video stays for `frames.py at` until the run ends
     (wd / "meeting.wav").unlink(missing_ok=True)
 
