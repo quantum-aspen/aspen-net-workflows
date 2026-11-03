@@ -245,8 +245,15 @@ def _srt_without(srt: str, spans: list[tuple[float, float]]) -> str:
     return "\n\n".join(kept) + "\n\n"
 
 
-def _transcribed_by(cfg: Config) -> str:
+def _transcribed_by(cfg: Config, wd: Path) -> str:
     if cfg.transcriber == "lumen":
+        if (wd / "review.json").exists():
+            n = sum(1 for c in json.loads((wd / "review.json").read_text())["chunks"] if c["whisper"])
+            if n:
+                return (
+                    f"{cfg.lumen_asr_model} on NCSA Lumen, with {n} misheard-looking passages "
+                    f"re-transcribed by faster-whisper {cfg.whisper_model}; timestamps approximate"
+                )
         chunk = f"{cfg.asr_chunk_seconds:g}"
         return f"{cfg.lumen_asr_model} on NCSA Lumen, timestamps approximate (~{chunk}s chunks)"
     return f"faster-whisper {cfg.whisper_model}, run locally"
@@ -272,7 +279,7 @@ def _transcript_folder(cfg: Config, wd: Path, result: check.Result, title: str, 
     (out / "transcript.md").write_text(
         f"---\ndate: {result.date}\ntitle: {result.title}\n"
         "source: Zoom cloud recording\n"
-        f"transcription: {_transcribed_by(cfg)}; no speaker labels\n"
+        f"transcription: {_transcribed_by(cfg, wd)}; no speaker labels\n"
         f"attendees: {json.dumps(result.attendees)}\nsummary: {wiki_url}\n---\n\n"
         f"# {title} — transcript\n\n## Known transcription errors\n\n"
         f"| Transcript says | Means |\n|---|---|\n{errors}\n\n---\n\n{clean.read_text()}"

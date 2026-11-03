@@ -45,6 +45,11 @@ class Config:
     asr_chunk_seconds: float
     asr_concurrency: int
     asr_prompt: str
+    whisper_threads: int
+    # review.py: "auto" re-checks a Lumen transcript's suspect chunks with whisper, "0" doesn't.
+    review: str
+    review_model: str
+    review_max_share: float
     run_hours: tuple[int, int] | None
     agent: str
     agent_model: str
@@ -62,6 +67,10 @@ class Config:
     @property
     def meetings_dir(self) -> Path:
         return self.data_dir / "meetings"
+
+    @property
+    def review_enabled(self) -> bool:
+        return self.review not in ("0", "false", "off", "") and self.transcriber == "lumen"
 
     def work_dir(self, doc_id: str) -> Path:
         # One recording page is one job, so its id names the work dir.
@@ -85,6 +94,12 @@ class Config:
             asr_chunk_seconds=float(e.get("ASR_CHUNK_SECONDS", "30")),
             asr_concurrency=int(e.get("ASR_CONCURRENCY", "4")),
             asr_prompt=e.get("TRANSCRIBE_PROMPT", ""),
+            whisper_threads=int(e.get("TRANSCRIBE_THREADS", "4")),
+            review=e.get("REVIEW", "auto"),
+            # The Lumen model that reads the transcript for misheard lines; hermes' by default.
+            review_model=e.get("REVIEW_MODEL")
+            or (e.get("AGENT_MODEL", "") if e.get("AGENT", "hermes") == "hermes" else ""),
+            review_max_share=float(e.get("REVIEW_MAX_SHARE", "0.5")),
             run_hours=_hours(e.get("RUN_HOURS", "")),
             agent=e.get("AGENT", "hermes"),
             agent_model=e.get("AGENT_MODEL", ""),

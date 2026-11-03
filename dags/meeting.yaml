@@ -44,8 +44,15 @@ steps:
     run: aspen-steps transcribe ${params.DOC_ID}
     retry_policy: *transient
 
+  # Re-checks the passages a Lumen transcript looks to have misheard, with whisper. Does
+  # nothing for a whisper transcript. Needs the roster from context for names.
+  - id: review
+    depends: [transcribe, context]
+    run: aspen-steps review ${params.DOC_ID}
+    retry_policy: *transient
+
   - id: frames
-    depends: transcribe  # it deletes the WAV whisper reads
+    depends: review  # it deletes the WAV that transcribe and review read
     run: aspen-steps frames ${params.DOC_ID}
     retry_policy: *transient
 

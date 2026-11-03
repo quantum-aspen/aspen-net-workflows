@@ -146,6 +146,28 @@ def segments(text: str, start: float, end: float) -> list[tuple[float, float, st
     return out
 
 
+def assemble(
+    spans: list[tuple[float, float]], texts: list[str], replaced: dict[int, list] | None = None
+) -> list[tuple[float, float, str]]:
+    """The transcript's segments: each chunk's text spread over its span, or, for a chunk in
+    `replaced`, the segments given for it there (already timed)."""
+    replaced = replaced or {}
+    out = []
+    for i, ((a, b), t) in enumerate(zip(spans, texts, strict=True)):
+        out += replaced[i] if i in replaced else segments(t, a, b)
+    return out
+
+
+def load_chunks(wd: Path) -> tuple[list[tuple[float, float]], list[str]] | None:
+    """The chunk spans and their texts from a Lumen transcription, or None if there wasn't one."""
+    cache = wd / "asr"
+    if not (cache / "chunks.json").exists():
+        return None
+    spans = [tuple(x) for x in json.loads((cache / "chunks.json").read_text())]
+    texts = [(cache / f"{i:05}.txt").read_text() for i in range(len(spans))]
+    return spans, texts
+
+
 def _ts(s: float) -> str:
     return str(timedelta(seconds=int(s)))
 
@@ -183,8 +205,9 @@ def transcribe(cfg: Config, wd: Path) -> None:
     print(f"{len(spans)} chunks over {_ts(total)}, {cfg.asr_concurrency} at a time, to {cfg.lumen_asr_model}")
     with ThreadPoolExecutor(cfg.asr_concurrency) as pool:
         texts = list(pool.map(lambda a: _transcribe_chunk(cfg, wav, cache, *a), enumerate(spans)))
-    segs = [s for (a, b), t in zip(spans, texts, strict=True) for s in segments(t, a, b)]
-    n = write(segs, wd / "transcript")
+    # The chunks are cut at pauses, so review.py can swap a whole chunk's text cleanly.
+    (cache / "chunks.json").write_text(json.dumps([[round(a, 3), round(b, 3)] for a, b in spans]))
+    n = write(assemble(spans, texts), wd / "transcript")
     el = time.time() - t0
     speed = f"{el / 60:.1f} min, {total / el:.1f}x realtime"
     print(f"LUMEN_ASR_DONE: {n} segments from {len(spans)} chunks in {speed}")

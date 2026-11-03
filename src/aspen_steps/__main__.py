@@ -9,7 +9,7 @@ import argparse
 import logging
 import sys
 
-from . import media, meeting
+from . import media, meeting, review
 from .config import Config
 from .errors import NeedsPerson
 from .outline import OutlineError
@@ -19,6 +19,7 @@ PROGRESS = {
     "window": "queued",
     "fetch": "working: downloading the recording",
     "transcribe": "working: transcribing",
+    "review": "working: checking the transcript",
     "summarise": "working: writing the summary",
     "publish": "working: publishing",
 }
@@ -27,6 +28,7 @@ PER_MEETING = {
     "window": lambda cfg, wd: meeting.wait_for_window(cfg),
     "fetch": media.fetch,
     "transcribe": media.transcribe,
+    "review": review.review,
     "frames": media.frames,
     "context": meeting.context,
     "summarise": meeting.summarise,
