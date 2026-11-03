@@ -27,6 +27,10 @@ from .errors import StepError
 
 SILENCE = re.compile(r"silence_(start|end): (-?[\d.]+)")
 SENTENCE = re.compile(r"(?<=[.!?])\s+")
+# Each chunk is evened out in loudness: on a test meeting granite-speech then punctuated and
+# cased consistently, where quiet chunks came back as lowercase run-ons. It doesn't fix
+# misheard terms, and Lumen ignores the `prompt` field, so vocabulary can't be steered.
+LOUDNORM = "loudnorm=I=-16:TP=-1.5:LRA=11"
 
 
 def duration(wav: Path) -> float:
@@ -72,7 +76,7 @@ def _audio(wav: Path, start: float, end: float, tmp: Path) -> bytes:
     # To a file, not a pipe: piped WAV has no length in its header.
     subprocess.run(
         ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{start:.3f}", "-to", f"{end:.3f}",
-         "-i", str(wav), "-ac", "1", "-ar", "16000", str(tmp)],
+         "-i", str(wav), "-ac", "1", "-ar", "16000", "-af", LOUDNORM, str(tmp)],
         capture_output=True, check=True,
     )  # fmt: skip
     try:
