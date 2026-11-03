@@ -28,6 +28,18 @@ Your working directory is the meeting's work directory:
 - `context/team.json`: the wiki's users, `[{name, id}]`. Resolve and spell team members'
   names from it.
 
+Names: the reference's attribution rule is strict, and turn boundaries in this transcript
+can't be seen, so apply it narrowly.
+
+- A name said near a line doesn't tell you who said that line. "Paul has his hand up",
+  "I think Paul has a comment" and "sorry, Paul" introduce or interrupt someone; the next
+  words may well be someone else's, often the person cutting in.
+- Name the speaker of an exchange only when the reference's conditions hold for those
+  exact lines: they say who they are ("This is Mike in Oregon"), they're presenting their
+  own work, or they answer a question put to them by name and nothing in between suggests
+  another voice. Otherwise write "it was raised that…" or "one view was…".
+- Attendance follows the same evidence: it isn't proof of who said what.
+
 Screenshots: this replaces what the references say about scene frames; there are none.
 
 - Every screenshot someone asked for with an `ai:` command goes in (`frames/commands.json`;
@@ -57,7 +69,12 @@ Write exactly two files, then stop.
     "off_record": [[<start s>, <end s>]]$series_row_example}
    ```
 
-   - `corrections` is the known-errors table for the saved transcript.
+   - `corrections` is the known-errors table at the top of the saved transcript: readers
+     take each row as fact. Add a row only when you know what was said: it's in the
+     reference's table, it's a team member's name (`team.json`), or the meeting itself shows
+     the right word (a slide, the chat, a clearer mention elsewhere in the transcript).
+     If you'd be guessing, leave it out; a misheard word left as it is does less harm than
+     a wrong correction. Use the same rule wherever you fix a term in the summary.
    - `off_record` lists the spans between `ai: off record` and `ai: on record`, in seconds
      into the recording. The workflow cuts them from the saved transcript; leave them out of
      the summary too. `[]` if there were none.

@@ -13,7 +13,7 @@ from importlib.resources import files
 from pathlib import Path
 from string import Template
 
-from . import agent, check, page
+from . import agent, check, media, page
 from .config import Config, in_window
 from .errors import NeedsPerson, StepError
 from .outline import Outline
@@ -82,7 +82,7 @@ def claim(cfg: Config, doc_id: str, series: dict[str, str] | None = None) -> Pat
     )
     text, passcode = page.claim(doc["text"], "queued")
     if passcode:
-        # A re-tick without a passcode keeps the one from last time, if fetch never used it.
+        # A re-tick without a passcode keeps the one from last time: it's kept until publish.
         secret = wd / ".passcode"
         secret.touch(mode=0o600)
         secret.write_text(passcode)
@@ -380,3 +380,4 @@ def publish(cfg: Config, wd: Path) -> None:
     for ref in used:
         shutil.copy(wd / ref, out / "frames" / Path(ref).name)
     print(f"transcript saved to {out}")
+    media.forget_passcode(wd)

@@ -43,12 +43,15 @@ def job(wd: Path) -> dict:
 
 
 def fetch(cfg: Config, wd: Path) -> None:
-    """The passcode reaches fetch.sh as ZOOM_PASSCODE and nothing else, and is deleted
-    once the download has worked."""
+    """The passcode reaches fetch.sh as ZOOM_PASSCODE and nothing else. It stays in the
+    work dir until publish, so a retried run can download the video again: the end of
+    every run (`clean`) deletes the media, and summarise needs the video for screenshots."""
     secret = wd / ".passcode"
-    if (wd / "meeting.wav").exists() or (wd / "transcript.srt").exists():
+    if (wd / "out" / "result.json").exists():
+        print("already summarised; the video isn't needed")
+        return
+    if (wd / "meeting.mp4").exists() and ((wd / "meeting.wav").exists() or (wd / "transcript.srt").exists()):
         print("already downloaded")
-        secret.unlink(missing_ok=True)
         return
     passcode = secret.read_text().strip() if secret.exists() else ""
     try:
@@ -64,7 +67,6 @@ def fetch(cfg: Config, wd: Path) -> None:
         if "rejected the passcode" in str(e):
             raise NeedsPerson(f"Zoom rejected the passcode: {RETICK}") from e
         raise
-    secret.unlink(missing_ok=True)
 
 
 def transcribe(cfg: Config, wd: Path) -> None:
@@ -101,6 +103,10 @@ def frames(cfg: Config, wd: Path) -> None:
         _run([*script, "commands", video.name, "chat.json", "frames"], wd)
     # whisper is done with it; the video stays for `frames.py at` until the run ends
     (wd / "meeting.wav").unlink(missing_ok=True)
+
+
+def forget_passcode(wd: Path) -> None:
+    (wd / ".passcode").unlink(missing_ok=True)
 
 
 def clean(wd: Path) -> None:
