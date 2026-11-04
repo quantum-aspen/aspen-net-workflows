@@ -20,6 +20,7 @@ series:
 Within 5 minutes the box turns into a status callout: `queued`, then `working: …`. When
 the summary is ready **it replaces the page**: the page you made becomes the meeting's
 summary, titled `YYYY-MM-DD <Meeting title>`, and gets a row in the series page's table.
+A series page without a table gets one (`## Meetings`: Date, Meeting, Key outcomes).
 
 If something goes wrong, the callout says why and an unticked box comes back. Fix what it
 says (a missing passcode, say) and tick it again. The run resumes from the last finished

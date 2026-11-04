@@ -168,16 +168,21 @@ def context(cfg: Config, wd: Path) -> None:
 
 def _prompt(cfg: Config, wd: Path) -> str:
     job = json.loads((wd / "job.json").read_text())
-    header = check.table_header((wd / "context" / "series.md").read_text())
-    if header:
-        row = (
-            f"- `series_row` is this meeting's row for the table on the series page, which has the "
-            f"columns {header}: one key per column, in the same style as the existing rows. Link "
-            "this summary as `{{page_url}}`; the workflow fills in its address."
-        )
-        example = ', "series_row": {' + ", ".join(f'"{h}": "…"' for h in header) + "}"
+    series = (wd / "context" / "series.md").read_text()
+    header = check.series_header(series)
+    if check.table_header(series):
+        style = "in the same style as the existing rows"
     else:
-        row, example = "", ""
+        style = (
+            "for a table the workflow adds, since the series page has no table yet: the date as "
+            "YYYY-MM-DD, the meeting as a link titled like the page, and its outcomes in a sentence"
+        )
+    row = (
+        f"- `series_row` is this meeting's row for the table on the series page, which has the "
+        f"columns {header}: one key per column, {style}. Link "
+        "this summary as `{{page_url}}`; the workflow fills in its address."
+    )
+    example = ', "series_row": {' + ", ".join(f'"{h}": "…"' for h in header) + "}"
     mentions = (
         "@mention attendees and action-item owners who are in `context/team.json`: "
         "`@[Name](mention://user/<id>)`."
@@ -338,8 +343,20 @@ def _transcript_folder(cfg: Config, wd: Path, result: check.Result, title: str, 
 
 
 def _insert_row(markdown: str, row: dict[str, str]) -> str:
-    """Adds a row after the last row of the first table."""
+    """Adds a row after the last row of the first table. A page with no table gets one,
+    under a "Meetings" heading, as the existing series pages have it."""
+    cells = lambda values: "| " + " | ".join(values) + " |"  # noqa: E731
     header = check.table_header(markdown)
+    if header is None:
+        header = check.NEW_SERIES_HEADER
+        table = "\n".join(
+            [
+                cells(header),
+                cells(["---"] * len(header)).replace(" ", ""),
+                cells(row.get(h, "") for h in header),
+            ]
+        )
+        return markdown.rstrip() + "\n\n## Meetings\n\n" + table + "\n"
     lines = markdown.splitlines()
     start = next(
         i for i, line in enumerate(lines) if [c.strip() for c in line.strip().strip("|").split("|")] == header
