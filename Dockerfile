@@ -49,4 +49,7 @@ HEALTHCHECK --interval=60s --timeout=5s --start-period=120s \
     CMD curl -fsS http://127.0.0.1:8080/api/v1/health || exit 1
 
 # Hermes' config (Lumen, no MCP servers) is written by the summarise step, from the env.
-CMD ["dagu", "start-all", "--host", "0.0.0.0", "--port", "8080"]
+COPY bin/start-workflows /usr/local/bin/start-workflows
+RUN chmod 755 /usr/local/bin/start-workflows
+# Dagu's server and scheduler, with the steps' output copied to the container log.
+CMD ["start-workflows", "--host", "0.0.0.0", "--port", "8080"]

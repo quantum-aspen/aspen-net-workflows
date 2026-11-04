@@ -51,6 +51,10 @@ on failure: fail (reason + retry box on the page)    on exit: clean (delete medi
 Meeting runs go one at a time (Dagu's per-DAG queue), so whisper never runs twice at once.
 `window` holds the run until `RUN_HOURS`.
 
+**Logs:** each step's output is in Dagu's run logs, and also in the container's log
+(so Grafana), every line prefixed with the step and the page: `[transcribe 9ab305e4] …`.
+`bin/start-workflows` makes the FIFO that carries them there (`console.py`).
+
 **Exit codes** decide retries: 0 done, 1 retry with backoff, 2 a person has to fix
 something (wrong passcode, no template, the agent says it can't summarise). Steps skip work
 whose output already exists, so retries and re-ticks are cheap.
