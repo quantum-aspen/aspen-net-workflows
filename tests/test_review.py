@@ -119,6 +119,7 @@ def test_review_request_turns_thinking_off_and_uses_the_review_model():
     assert body["model"] == "nemotron"
     assert body["messages"] == [{"role": "user", "content": "the prompt"}]
     assert body["chat_template_kwargs"] == {"enable_thinking": False}
+    assert body["response_format"] == {"type": "json_object"}
 
 
 def test_review_is_on_only_for_lumen_and_borrows_hermes_model():
