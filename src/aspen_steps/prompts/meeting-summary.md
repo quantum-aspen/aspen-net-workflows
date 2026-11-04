@@ -18,7 +18,7 @@ Your working directory is the meeting's work directory:
   request in the chat, if there were any
 - `meeting.mp4` (and `share.mp4` if it exists): for
   `python3 $scripts/frames.py at <video> <seconds> frames/<name>.png`
-- `context/series.md`: the series page this meeting belongs to, "$series"
+- `context/series.md`: the series page this meeting belongs to, "$series", with its address
 - `context/earlier/`: the latest summaries in that series. Read them, so cross-references
   are real.
 - `context/template.md`: the Meeting summary template. `!!…!!` marks a placeholder;
@@ -43,6 +43,10 @@ Write exactly two files, then stop.
 1. `out/summary.md`: the page body, filled in from the template.
    - No H1: the title is a separate field.
    - The header's Recording row links $url
+   - The header's Series row is $series_link. Previous links the latest summary in
+     `context/earlier/` by its title and the address under it, or is `—` if there's none.
+   - Link wiki pages only by the addresses the context files give ("This page's
+     address: …", or links already in them). You can't look one up, so never make one up.
    - $mentions
    - Place each screenshot as `![caption](frames/<file>.png)` at the topic it belongs to.
      The workflow uploads it. Reference only frames that exist.
