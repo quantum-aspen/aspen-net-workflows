@@ -9,7 +9,7 @@ import argparse
 import logging
 import sys
 
-from . import media, meeting, review
+from . import console, media, meeting, review
 from .config import Config
 from .errors import NeedsPerson
 from .outline import OutlineError
@@ -38,6 +38,17 @@ PER_MEETING = {
 
 
 def main(argv: list[str] | None = None) -> int:
+    args = sys.argv[1:] if argv is None else argv
+    # "[transcribe 9ab305e4]": which step, for which recording page, in the container log
+    prefix = "[" + " ".join(a[:8] if i else a for i, a in enumerate(args[:2])) + "] "
+    stop = console.tee(prefix)
+    try:
+        return _main(argv)
+    finally:
+        stop()
+
+
+def _main(argv: list[str] | None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     ap = argparse.ArgumentParser(prog="aspen-steps")
     ap.add_argument("step", choices=["poll", "claim", "fail", *PER_MEETING])

@@ -1,0 +1,11 @@
+#!/bin/sh
+# The image's CMD. Dagu writes each step's output to its own log files, so only its server
+# log would reach `docker logs` (and Grafana). aspen-steps copies its lines into this FIFO
+# (console.py); cat passes them on to the container's stdout. Opening the FIFO read-write
+# keeps cat from seeing EOF between steps.
+set -e
+fifo=/tmp/aspen-steps.log
+rm -f "$fifo"
+mkfifo -m 600 "$fifo"
+cat <>"$fifo" &
+exec dagu start-all "$@"
