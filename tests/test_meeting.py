@@ -191,3 +191,53 @@ def test_without_a_table_the_agent_writes_a_row_for_the_one_to_come(wd):
     assert any(
         "columns the series table doesn't" in p for p in check.problems(wd, result, summary, mentions=True)
     )
+
+
+class _Wiki:
+    """The reads context makes, from a wiki with one series and one earlier summary."""
+
+    def users(self):
+        return [{"name": "Gina Lorenz", "id": GINA}]
+
+    def document(self, doc_id):
+        return {"title": "Test Series", "url": "/doc/test-series-bZcTFyOMgH", "text": "Purpose.\n"}
+
+    def children(self, collection, parent):
+        return [
+            {
+                "title": "2026-09-10 Earlier talk",
+                "url": "/doc/2026-09-10-earlier-talk-Ab12Cd34Ef",
+                "text": "Summary text.\n",
+            }
+        ]
+
+    def templates(self, collection):
+        return [{"title": "Meeting summary", "text": "| Series | *!!series page!!* |\n"}]
+
+
+def test_context_gives_the_agent_real_page_addresses(wd, monkeypatch):
+    monkeypatch.setattr(meeting, "outline", lambda cfg, *a: _Wiki())
+    meeting.context(Config.from_env({}), wd)
+    assert "/doc/test-series-bZcTFyOMgH" in (wd / "context" / "series.md").read_text()
+    earlier = (wd / "context" / "earlier" / "2026-09-10 Earlier talk.md").read_text()
+    assert "/doc/2026-09-10-earlier-talk-Ab12Cd34Ef" in earlier
+    prompt = meeting._prompt(Config.from_env({}), wd)
+    series = json.loads((wd / "job.json").read_text())["series"]
+    assert f"[{series}](/doc/test-series-bZcTFyOMgH)" in prompt
+
+
+def test_a_made_up_wiki_link_is_sent_back(wd, monkeypatch):
+    monkeypatch.setattr(meeting, "outline", lambda cfg, *a: _Wiki())
+    meeting.context(Config.from_env({}), wd)
+    url = json.loads((wd / "job.json").read_text())["url"]
+    for link, ok in [
+        ("https://wiki.quantum-aspen.net/doc/test-series", False),  # what the first live run wrote
+        ("/doc/test-series", False),
+        ("/doc/test-series-bZcTFyOMgH", True),
+        ("https://wiki.quantum-aspen.net/doc/2026-09-10-earlier-talk-Ab12Cd34Ef", True),
+        ("https://docs.example.org/doc/anything", True),  # not the wiki's
+    ]:
+        _agent_output(wd, summary=f"| Series | [Test Series]({link}) |\n| **Recording** | {url} |\n")
+        result, summary = check.load(wd)
+        found = check.problems(wd, result, summary, mentions=True, wiki="https://wiki.quantum-aspen.net")
+        assert any("isn't a page in the context" in p for p in found) != ok, (link, found)

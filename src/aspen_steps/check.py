@@ -11,6 +11,9 @@ from pydantic import BaseModel, ValidationError, field_validator
 
 MENTION = re.compile(r"mention://user/([\w-]+)")
 IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)\)")
+# A markdown link's target; WIKI_DOC finds the wiki page path in one.
+LINK = re.compile(r"\]\(([^)\s]+)\)")
+WIKI_DOC = re.compile(r"/doc/[\w-]+")
 
 
 class Correction(BaseModel):
@@ -65,7 +68,27 @@ def load(wd: Path) -> tuple[Result, str]:
     return result, summary.read_text() if summary.exists() else ""
 
 
-def problems(wd: Path, result: Result, summary: str, *, mentions: bool) -> list[str]:
+def _known_pages(wd: Path) -> set[str]:
+    """Every wiki page path the context files name: the only ones the agent can know."""
+    return {p for f in (wd / "context").rglob("*.md") for p in WIKI_DOC.findall(f.read_text())}
+
+
+def _wiki_path(link: str, wiki: str) -> str | None:
+    """The /doc/… path of a link to a wiki page, relative or on the wiki's host; else None."""
+    host = wiki.rstrip("/")
+    if link.startswith("/doc/"):
+        rest = link
+    elif host and link.startswith(host + "/doc/"):
+        rest = link[len(host) :]
+    else:
+        return None
+    m = WIKI_DOC.match(rest)
+    return m.group(0) if m else None
+
+
+def problems(
+    wd: Path, result: Result, summary: str, *, mentions: bool, wiki: str = "https://wiki.quantum-aspen.net"
+) -> list[str]:
     """Everything wrong with the agent's output, as lines it can act on. [] means publishable."""
     if result.error:
         return []
@@ -106,6 +129,15 @@ def problems(wd: Path, result: Result, summary: str, *, mentions: bool) -> list[
             out.append(f"image {ref} isn't under frames/")
         elif not (wd / ref).is_file():
             out.append(f"image {ref} doesn't exist")
+    known = _known_pages(wd)
+    for link in dict.fromkeys(LINK.findall(summary)):
+        path = _wiki_path(link, wiki)
+        if path and path not in known:
+            out.append(
+                f"link {link} isn't a page in the context files; link wiki pages only by the "
+                "addresses given there (the series page's and the earlier summaries' are under "
+                "their titles)"
+            )
     header = series_header((wd / "context" / "series.md").read_text())
     if result.series_row is not None:
         if extra := set(result.series_row) - set(header):

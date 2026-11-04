@@ -128,6 +128,21 @@ def wait_for_window(cfg: Config) -> None:
 # ---- context -------------------------------------------------------------------------
 
 
+ADDRESS = "This page's address: "
+
+
+def _with_address(doc: dict) -> str:
+    """A page for context/, with the address to link it by: the agent can't look one up,
+    and a guessed one (`/doc/test-series`) is a broken link."""
+    return f"# {doc['title']}\n\n{ADDRESS}{doc['url']}\n\n{doc['text']}"
+
+
+def _address(markdown: str) -> str:
+    return next(
+        (line[len(ADDRESS) :].strip() for line in markdown.splitlines() if line.startswith(ADDRESS)), ""
+    )
+
+
 def context(cfg: Config, wd: Path) -> None:
     """Everything the agent would otherwise read from the wiki, written to context/."""
     ol = outline(cfg)
@@ -140,7 +155,7 @@ def context(cfg: Config, wd: Path) -> None:
     (ctx / "team.json").write_text(json.dumps(team, indent=1) + "\n")
 
     s = ol.document(job["series_id"])
-    (ctx / "series.md").write_text(f"# {s['title']}\n\n{s['text']}")
+    (ctx / "series.md").write_text(_with_address(s))
 
     dated = re.compile(r"\d{4}-\d{2}-\d{2} ")
     earlier = sorted(
@@ -149,7 +164,7 @@ def context(cfg: Config, wd: Path) -> None:
         reverse=True,
     )[:EARLIER]
     for d in earlier:
-        (ctx / "earlier" / f"{d['title'].replace('/', '-')}.md").write_text(f"# {d['title']}\n\n{d['text']}")
+        (ctx / "earlier" / f"{d['title'].replace('/', '-')}.md").write_text(_with_address(d))
 
     template = next(
         (t for t in ol.templates(cfg.meetings_collection) if t["title"] == "Meeting summary"), None
@@ -169,6 +184,7 @@ def context(cfg: Config, wd: Path) -> None:
 def _prompt(cfg: Config, wd: Path) -> str:
     job = json.loads((wd / "job.json").read_text())
     series = (wd / "context" / "series.md").read_text()
+    series_link = f"[{job['series']}]({_address(series)})"
     header = check.series_header(series)
     if check.table_header(series):
         style = "in the same style as the existing rows"
@@ -194,6 +210,7 @@ def _prompt(cfg: Config, wd: Path) -> str:
         scripts=cfg.scripts_dir,
         wd=wd.resolve(),
         series=job["series"],
+        series_link=series_link,
         url=job["url"],
         mentions=mentions,
         series_row=row,
@@ -239,7 +256,7 @@ def summarise(cfg: Config, wd: Path, attempts: int = 2) -> None:
         rc = agent.run(cfg, prompt, wd, read_dirs=[cfg.scripts_dir], commands=[frames_at])
         try:
             result, summary = check.load(wd)
-            found = check.problems(wd, result, summary, mentions=cfg.mentions)
+            found = check.problems(wd, result, summary, mentions=cfg.mentions, wiki=cfg.outline_url)
         except ValueError as e:
             found = [str(e)]
         if not found:
