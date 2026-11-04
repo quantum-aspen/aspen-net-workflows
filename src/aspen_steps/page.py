@@ -37,8 +37,11 @@ LINK = re.compile(r"https://[\w.-]*zoom\.us/rec/(?:share|play)/[^\s)\]>\\]+")
 HREF = re.compile(rf"\]\((?P<url>{LINK.pattern})\)")
 # Outline's markdown backslash-escapes punctuation it could read as syntax ($, #, *, …).
 ESCAPE = re.compile(r"\\([!-/:-@\[-`{-~])")
+# Outline gives a callout back with blank lines inside its fences (`\n\n:::`), so allow them.
 STATUS = re.compile(
-    r"^:::(?P<kind>\w+)[ \t]*\n[ \t]*\*\*Transcription:\*\*[ \t]*(?P<text>.*?)[ \t]*\n:::[ \t]*$", re.M
+    r"^:::(?P<kind>\w+)[ \t]*\n(?:[ \t]*\n)*[ \t]*\*\*Transcription:\*\*[ \t]*(?P<text>.*?)[ \t]*\n"
+    r"(?:[ \t]*\n)*:::[ \t]*$",
+    re.M,
 )
 
 
@@ -99,7 +102,10 @@ def set_status(text: str, status: str, *, failed: bool = False) -> str:
         block += f"\n\n- [ ] {FLAG_TEXT}"
         text = FLAG.sub("", text)
     if STATUS.search(text):
-        text = STATUS.sub(lambda _: block, text, count=1)
+        # Replace the first, and drop any others: before Outline's blank lines were allowed
+        # for, each update added a callout instead of replacing one.
+        first = iter([block])
+        text = STATUS.sub(lambda _: next(first, ""), text)
     else:
         text = text.rstrip() + "\n\n" + block
     return re.sub(r"\n{3,}", "\n\n", text).strip() + "\n"
