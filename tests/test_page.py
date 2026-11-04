@@ -152,3 +152,51 @@ def test_the_test_meeting_page_as_outline_returned_it():
     assert p.passcode == "a.b&cde$"
     claimed, _ = page.claim(text, "queued")
     assert "cde$" not in claimed
+
+
+# How Outline gives a status callout back after a real write: a blank line before the
+# closing fence. The dry run never round-tripped one, so every update added another.
+OUTLINE_PILED_UP = """* Zoom Link: [x](https://cuboulder.zoom.us/rec/share/abc)
+
+  \\
+
+
+:::info
+**Transcription:** queued
+
+:::
+
+
+:::info
+**Transcription:** queued
+
+:::
+
+
+:::info
+**Transcription:** working: downloading the recording
+
+:::
+"""
+
+
+def test_status_found_in_outlines_round_tripped_callout():
+    text = ":::info\n**Transcription:** working: transcribing\n\n:::\n"
+    assert page.parse(text).status == "working: transcribing"
+    text = page.set_status(text, "working: checking the transcript")
+    assert page.parse(text).status == "working: checking the transcript"
+    assert text.count("**Transcription:**") == 1
+
+
+def test_piled_up_callouts_collapse_into_one():
+    text = page.set_status(OUTLINE_PILED_UP, "working: transcribing")
+    assert text.count("**Transcription:**") == 1
+    assert page.parse(text).status == "working: transcribing"
+    assert "cuboulder.zoom.us" in text
+
+
+def test_a_failure_on_a_piled_up_page_leaves_one_callout_and_one_box():
+    text = page.set_status(OUTLINE_PILED_UP, "failed: no passcode", failed=True)
+    assert text.count("**Transcription:**") == 1 and text.count("Ready to transcribe") == 1
+    again, _ = page.claim(text.replace("- [ ] Ready", "- [x] Ready"), "queued")
+    assert again.count("**Transcription:**") == 1 and page.parse(again).status == "queued"

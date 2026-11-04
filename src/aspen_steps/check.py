@@ -45,6 +45,15 @@ def table_header(markdown: str) -> list[str] | None:
     return None
 
 
+# The table a series page gets when it has none: the columns the existing series use.
+NEW_SERIES_HEADER = ["Date", "Meeting", "Key outcomes"]
+
+
+def series_header(markdown: str) -> list[str]:
+    """The series table's columns: the page's own table, or the one publish will add."""
+    return table_header(markdown) or NEW_SERIES_HEADER
+
+
 def load(wd: Path) -> tuple[Result, str]:
     try:
         result = Result.model_validate_json((wd / "out" / "result.json").read_text())
@@ -97,10 +106,8 @@ def problems(wd: Path, result: Result, summary: str, *, mentions: bool) -> list[
             out.append(f"image {ref} isn't under frames/")
         elif not (wd / ref).is_file():
             out.append(f"image {ref} doesn't exist")
-    header = table_header((wd / "context" / "series.md").read_text())
+    header = series_header((wd / "context" / "series.md").read_text())
     if result.series_row is not None:
-        if header is None:
-            out.append("series_row is set, but the series page has no table")
-        elif extra := set(result.series_row) - set(header):
+        if extra := set(result.series_row) - set(header):
             out.append(f"series_row has columns the series table doesn't: {sorted(extra)}; it has {header}")
     return out

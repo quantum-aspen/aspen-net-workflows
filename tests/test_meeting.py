@@ -163,3 +163,31 @@ def test_a_dry_run_never_sends_a_write(tmp_path, monkeypatch):
     assert (out / "02 update New recording.md").read_text() == "new text\n"
     diff = (out / "02 update New recording.diff").read_text()
     assert "-old text" in diff and "+new text" in diff and "+# 2026-10-27 Done" in diff
+
+
+NEW_SERIES = "# Test Series\n\nWhere new recordings are tried out.\n"
+ROW = {"Date": "2026-10-27", "Meeting": "[x](/doc/x)", "Key outcomes": "ZeroMQ agreed"}
+
+
+def test_a_series_page_without_a_table_gets_one():
+    text = meeting._insert_row(NEW_SERIES, ROW)
+    assert text.startswith(NEW_SERIES.rstrip())
+    assert "## Meetings\n\n| Date | Meeting | Key outcomes |\n|---|---|---|\n" in text
+    assert text.rstrip().endswith("| 2026-10-27 | [x](/doc/x) | ZeroMQ agreed |")
+    # and the next meeting goes into that table, not a second one
+    again = meeting._insert_row(text, ROW | {"Date": "2026-11-05"})
+    assert again.count("## Meetings") == 1 and again.count("| Date |") == 1
+
+
+def test_without_a_table_the_agent_writes_a_row_for_the_one_to_come(wd):
+    (wd / "context" / "series.md").write_text(NEW_SERIES)
+    prompt = meeting._prompt(Config.from_env({}), wd)
+    assert "['Date', 'Meeting', 'Key outcomes']" in prompt and "no table yet" in prompt
+    _agent_output(wd, series_row=ROW)
+    result, summary = check.load(wd)
+    assert check.problems(wd, result, summary, mentions=True) == []
+    _agent_output(wd, series_row={"Speaker": "x"})
+    result, summary = check.load(wd)
+    assert any(
+        "columns the series table doesn't" in p for p in check.problems(wd, result, summary, mentions=True)
+    )
