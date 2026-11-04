@@ -113,6 +113,14 @@ def test_assemble_swaps_in_a_rechecked_chunk():
     ]
 
 
+def test_review_request_turns_thinking_off_and_uses_the_review_model():
+    cfg = Config.from_env({"TRANSCRIBER": "lumen", "AGENT_MODEL": "deepseek", "REVIEW_MODEL": "nemotron"})
+    body = review.chat_body(cfg, "the prompt")
+    assert body["model"] == "nemotron"
+    assert body["messages"] == [{"role": "user", "content": "the prompt"}]
+    assert body["chat_template_kwargs"] == {"enable_thinking": False}
+
+
 def test_review_is_on_only_for_lumen_and_borrows_hermes_model():
     lumen = Config.from_env({"TRANSCRIBER": "lumen", "AGENT_MODEL": "deepseek"})
     assert lumen.review_enabled and lumen.review_model == "deepseek"
