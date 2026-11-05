@@ -50,6 +50,13 @@ def test_hermes_config_points_at_lumen_and_drops_mcp(tmp_path):
     }  # fmt: skip
     assert data["auxiliary"]["vision"]["model"] == "v"
     assert data["agent"] == {"x": 1, "api_max_retries": 6, "reasoning_effort": "none"}
+    assert data["custom_providers"] == [
+        {
+            "name": "lumen",
+            "base_url": "https://lumen.ncsa.illinois.edu/v1",
+            "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
+        }
+    ]
     assert "mcp_servers" not in data
     assert "lu-secret" not in text
 

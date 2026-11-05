@@ -65,6 +65,16 @@ def hermes_settings(cfg: Config) -> dict:
             "reasoning_effort": "none",
         },
     }
+    # Thinking off for every model on Lumen, as in review.chat_body: Nemotron there reasons
+    # without end and never answers, and `reasoning_effort` above doesn't stop it. Hermes merges
+    # a custom provider's extra_body into each request to its base_url.
+    s["custom_providers"] = [
+        {
+            "name": "lumen",
+            "base_url": cfg.lumen_base_url,
+            "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
+        }
+    ]
     if cfg.lumen_vision_model:
         s["auxiliary"]["vision"] = lumen | {"model": cfg.lumen_vision_model}
     return s

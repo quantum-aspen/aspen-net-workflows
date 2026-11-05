@@ -188,8 +188,26 @@ def near_misses(texts: list[str], terms: list[str], cutoff: float = 0.8) -> dict
     return out
 
 
+def chat_body(cfg: Config, prompt: str) -> dict:
+    """The review request. Thinking is switched off: this is a read-through, not a puzzle, and
+    a reasoning model left to think (Nemotron on Lumen, 2026-11-04) can spend 6,000+ tokens
+    without ever answering, until Lumen gives up with "Upstream error" minutes later.
+    `reasoning_effort` doesn't stop it there; `chat_template_kwargs` does. Models that don't
+    think (DeepSeek on Lumen, same prompt) accept it and ignore it.
+
+    JSON mode, because Nemotron wrote `"why": 'AO' is ambiguous…` (no opening quote) in 4 of
+    5 answers; with response_format it parsed 5 of 5."""
+    return {
+        "model": cfg.review_model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0,
+        "chat_template_kwargs": {"enable_thinking": False},
+        "response_format": {"type": "json_object"},
+    }
+
+
 def _chat(cfg: Config, prompt: str) -> str:
-    body = {"model": cfg.review_model, "messages": [{"role": "user", "content": prompt}], "temperature": 0}
+    body = chat_body(cfg, prompt)
     req = urllib.request.Request(
         f"{cfg.lumen_base_url}/chat/completions",
         data=json.dumps(body).encode(),
